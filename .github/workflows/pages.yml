@@ -14,10 +14,23 @@ permissions:
 
 concurrency:
   group: pages
-  cancel-in-progress: true
+  cancel-in-progress: false
 
 jobs:
+  # Kept separate and free of an `environment:` block on purpose. The
+  # github-pages environment is only grantable once the repository's Pages
+  # source is "GitHub Actions"; a job that declares it while the source is
+  # still branch-based is rejected before its first step runs. So the switch
+  # has to happen in a job that does not declare the environment.
+  configure:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/configure-pages@v5
+        with:
+          enablement: true
+
   deploy:
+    needs: configure
     environment:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
@@ -25,10 +38,6 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: actions/configure-pages@v5
-        # Switches the repository's Pages source to GitHub Actions on the
-        # first run, so publishing needs no manual setup.
-        with:
-          enablement: true
       - uses: actions/upload-pages-artifact@v3
         with:
           path: .
