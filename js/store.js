@@ -14,7 +14,8 @@
     showHints: true,
     speakWords: false,
     autoAdvance: true,
-    hardestFirst: false
+    hardestFirst: false,
+    adaptiveSplit: true
   };
 
   /* days until a word in each box comes back around */

@@ -2,6 +2,7 @@
 (function () {
   const Store = window.WordStore;
   const Splitter = window.WordSplitter;
+  const Learner = window.WordLearner || null;
   const MORPHEMES = window.WS_MORPHEMES;
   const ORIGIN_NAMES = window.WS_ORIGIN_NAMES;
 
@@ -163,7 +164,44 @@
           shared.map(w => esc(w)).join(", ") + "</p>";
       }
     }
+
+    /* Teaching the splitter is only offered where a reading is actually in
+     * question — not mid-quiz, and not for words it refused to split. */
+    if (options.allowTeach && Learner && result.parts.length > 1 && !result.overridden) {
+      html +=
+        '<div class="teach" data-teach-word="' + esc(word) + '">' +
+        '<span class="small muted">Is this breakdown right?</span>' +
+        '<span class="teachBtns">' +
+        '<button class="pill" data-teach="yes">Yes</button>' +
+        '<button class="pill" data-teach="other">Show other readings</button>' +
+        "</span></div>";
+    }
     return html;
+  }
+
+  /* The ranked alternatives, for someone to pick the right one from. */
+  function alternativesHTML(word) {
+    const cands = Splitter.candidates(word, 6);
+    if (cands.length < 2) {
+      return '<p class="small muted">The splitter only sees one way to read this word.</p>';
+    }
+    return (
+      '<div class="sectionTitle">Pick the right reading</div>' +
+      '<div class="list">' +
+      cands.map((c, i) =>
+        '<button class="listItem" data-pick="' + esc(c.signature) +
+        '" data-pick-word="' + esc(word) + '"><span>' +
+        '<span class="lw">' + c.parts.map(p => esc(p.text)).join(" + ") + "</span>" +
+        '<span class="ld">' +
+        c.parts.map(p => esc(p.entry ? p.meaning : "base word")).join(" · ") +
+        "</span></span>" +
+        (i === 0 ? '<span class="small muted">current</span>' : "") +
+        "</button>"
+      ).join("") +
+      "</div>" +
+      '<p class="small muted">Choosing one teaches the splitter. It learns the ' +
+      "word parts, not just this word, so related words shift too.</p>"
+    );
   }
 
   /* morpheme id -> words containing it. Splitting the whole corpus costs a
@@ -205,7 +243,7 @@
 
   /* ---------- view: split ---------- */
 
-  function renderSplit() {
+  function renderSplit(preload) {
     viewTitle.textContent = "WordSplit";
     const words = activeWords();
     const daily = words[Math.floor(dayNumber() % words.length)];
@@ -215,7 +253,7 @@
       'autocorrect="off" spellcheck="false" placeholder="Type any word to break apart…">' +
       '<div id="splitResult"></div>' +
       '<div class="sectionTitle">Word of the day</div>' +
-      '<div class="card" id="dailyCard">' + splitHTML(daily) + "</div>" +
+      '<div class="card" id="dailyCard">' + splitHTML(daily, { allowTeach: true }) + "</div>" +
       '<button class="btn wide" id="randomBtn">🎲 Split a random word</button>';
 
     const input = document.getElementById("splitInput");
@@ -227,7 +265,8 @@
         result.innerHTML = "";
         return;
       }
-      result.innerHTML = '<div class="card">' + splitHTML(value) + "</div>";
+      result.innerHTML =
+        '<div class="card">' + splitHTML(value, { allowTeach: true }) + "</div>";
       if (!ALL_WORDS.has(value)) {
         result.innerHTML +=
           '<p class="small muted center">Not in your word lists — split from the ' +
@@ -237,6 +276,10 @@
 
     input.addEventListener("input", run);
     input.addEventListener("search", run);
+    if (preload) {
+      input.value = preload;
+      run();
+    }
     document.getElementById("randomBtn").addEventListener("click", () => {
       const w = words[Math.floor(Math.random() * words.length)];
       input.value = w;
@@ -296,6 +339,8 @@
       esc(label) + "</div></div>";
   }
 
+  let sessionCounter = 0;
+
   function startSession(mode) {
     const settings = Store.getSettings();
     const words = activeWords();
@@ -334,6 +379,9 @@
     }
 
     state.session = {
+      /* stamped so a timer left over from a previous session cannot advance
+       * this one when someone quits and restarts quickly */
+      id: (sessionCounter += 1),
       mode,
       queue: pool,
       index: 0,
@@ -539,8 +587,11 @@
     next.focus();
 
     if (Store.getSettings().autoAdvance && correct) {
+      const sessionId = state.session.id;
+      const at = state.session.index;
       setTimeout(() => {
-        if (state.session && state.session.answered) advance(true, word);
+        const s = state.session;
+        if (s && s.id === sessionId && s.index === at && s.answered) advance(true, word);
       }, 1100);
     }
   }
@@ -739,7 +790,7 @@
     const e = Store.entry(word);
     view.innerHTML =
       '<button class="btn" id="backBtn" style="margin-bottom:12px">‹ Back</button>' +
-      '<div class="card">' + splitHTML(word) + "</div>" +
+      '<div class="card">' + splitHTML(word, { allowTeach: true }) + "</div>" +
       '<div class="statGrid">' +
       stat(e.seen, "times seen") +
       stat(e.right, "correct") +
@@ -767,6 +818,36 @@
     const [kind, form] = piece.dataset.morpheme.split(":");
     state.rootFilter = kind;
     showMorphemeDetail(kind, form);
+  });
+
+  /* Teaching: confirm a reading, or open the alternatives and pick one. */
+  view.addEventListener("click", e => {
+    const btn = e.target.closest("[data-teach]");
+    if (btn) {
+      const host = btn.closest(".teach");
+      const word = host.dataset.teachWord;
+      if (btn.dataset.teach === "yes") {
+        const current = Splitter.split(word);
+        Learner.learnFromChoice(word, current.signature);
+        host.innerHTML = '<span class="small ok">Thanks — noted.</span>';
+        return;
+      }
+      const panel = document.createElement("div");
+      panel.className = "altPanel";
+      panel.innerHTML = alternativesHTML(word);
+      host.parentNode.insertBefore(panel, host.nextSibling);
+      btn.disabled = true;
+      return;
+    }
+
+    const pick = e.target.closest("[data-pick]");
+    if (!pick) return;
+    const word = pick.dataset.pickWord;
+    const changed = Learner.learnFromChoice(word, pick.dataset.pick);
+    toast(changed ? "Learned — thanks" : "Could not use that reading");
+    morphemeIndex = null; /* weights moved, so cached splits are stale */
+    if (state.view === "split") renderSplit(word);
+    else showWordDetail(word);
   });
 
   /* ---------- view: roots ---------- */
@@ -906,6 +987,8 @@
       ).join("") +
       "</select></div></div>" +
 
+      (Learner ? learningSectionHTML() : "") +
+
       '<div class="sectionTitle">Progress</div><div class="card">' +
       '<div class="statGrid">' +
       stat(stats.studied || 0, "answers given") +
@@ -952,6 +1035,23 @@
       applyTheme();
     });
 
+    if (Learner) {
+      document.getElementById("adaptiveSplit").addEventListener("change", e => {
+        Store.setSetting("adaptiveSplit", e.target.checked);
+        Learner.setEnabled(e.target.checked);
+        morphemeIndex = null;
+        toast(e.target.checked ? "Adaptive splitting on" : "Using the plain rules");
+      });
+      document.getElementById("resetLearnBtn").addEventListener("click", () => {
+        if (!window.confirm("Forget the corrections made on this device? The " +
+          "model the app shipped with is kept.")) return;
+        Learner.reset();
+        morphemeIndex = null;
+        renderSettings();
+        toast("Corrections forgotten");
+      });
+    }
+
     document.getElementById("resetBtn").addEventListener("click", () => {
       if (!window.confirm("Erase every word's progress and streak? This cannot be undone.")) return;
       Store.resetProgress();
@@ -959,6 +1059,43 @@
       renderSettings();
       toast("Progress reset");
     });
+  }
+
+  /* What the splitter has learned, shown rather than hidden: the morphemes it
+   * currently trusts most and least, and how much of that came from here. */
+  function learningSectionHTML() {
+    const s = Store.getSettings();
+    const info = Learner.stats();
+    const tw = Learner.topWeights(4);
+    const row = r =>
+      '<li><b>' + esc(r.key) + "</b> <span class=\"muted\">" + esc(r.kind) + " · " +
+      esc(r.meaning) + "</span></li>";
+
+    return (
+      '<div class="sectionTitle">Adaptive splitting</div><div class="card">' +
+      settingSwitch(
+        "adaptiveSplit",
+        "Learn from corrections",
+        "Let the splitter improve as you correct it",
+        s.adaptiveSplit !== false
+      ) +
+      '<div class="statGrid" style="margin-top:12px">' +
+      stat(info.corrections, "corrections made") +
+      stat(info.learnedHere, "weights changed here") +
+      "</div>" +
+      '<p class="small muted" style="margin-top:12px">The app ships with ' +
+      info.shipped + " weights already trained on its verified splits. Every " +
+      "correction you make in the Split view adjusts the word part itself, so " +
+      "related words shift too.</p>" +
+      (tw.top.length
+        ? '<p class="small" style="margin-bottom:4px"><b>Trusts most</b></p>' +
+          '<ul class="weightList">' + tw.top.map(row).join("") + "</ul>" +
+          '<p class="small" style="margin:10px 0 4px"><b>Trusts least</b></p>' +
+          '<ul class="weightList">' + tw.bottom.map(row).join("") + "</ul>"
+        : "") +
+      '<button class="btn wide" id="resetLearnBtn" style="margin-top:12px">' +
+      "Forget my corrections</button></div>"
+    );
   }
 
   function settingSwitch(id, name, desc, checked) {
@@ -1013,6 +1150,7 @@
 
   applyTheme();
   updateStreakChip();
+  if (Learner) Learner.setEnabled(Store.getSettings().adaptiveSplit !== false);
   go("split");
 
   if ("serviceWorker" in navigator) {

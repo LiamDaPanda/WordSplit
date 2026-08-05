@@ -48,6 +48,24 @@
     minute: "=",
     second: "=",
     system: "=",
+    /* A long suffix must not swallow the tail of the root: these teach the
+     * model to keep "cret" over "cre"+"tion", "volut" over "vol"+"ute". */
+    convolute: "con|volut|",
+    convoluted: "con|volut|",
+    evolution: "e|volut|ion",
+    revolution: "re|volut|ion",
+    accretion: "ad|cret|ion",
+    discretion: "dis|cret|ion",
+    discreet: "dis|cret|",
+    secrete: "se|cret|",
+    benediction: "bene|dict|ion",
+    malediction: "mal|dict|ion",
+    interdict: "inter|dict|",
+    edict: "e|dict|",
+    indict: "in|dict|",
+    epigram: "epi|gram|",
+    annex: "ad|nex|",
+    apotheosis: "apo|the|osis",
     reticent: "re|tac|ent",
     taciturn: "|tac|",
     laconic: "|lac|ic",
@@ -798,11 +816,15 @@
       }
     }
 
-    /* stem dropped a final vowel before a suffix (e.g. "curs" + "ory") */
+    /* stem dropped a final vowel before a suffix (e.g. "curs" + "ory").
+     * `surface` records the letters actually present, so the display never
+     * shows a letter the word does not contain. */
     if (stem.length >= 3) {
       for (const v of "aeiou") {
         const entry = lookup("root", stem + v);
-        if (entry) consider({ form: stem + v, entry, score: 80, extra: "", elided: v });
+        if (entry) {
+          consider({ form: stem + v, entry, score: 80, extra: "", elided: v, surface: stem });
+        }
       }
     }
 
@@ -870,23 +892,68 @@
     return { word, parts, confidence: "high", overridden: true };
   }
 
-  /* Best prefix/root/suffix reading of a single spelling, or null. */
-  function bestSegmentation(stemWord) {
-    const prefixStates = matchPrefixes(stemWord, 2);
-    let best = null;
-    prefixStates.forEach(pre => {
-      const suffixStates = matchSuffixes(pre.rest, 3);
-      suffixStates.forEach(suf => {
+  /* Every plausible prefix/root/suffix reading of a spelling, each carrying
+   * the heuristic score and the feature vector the learner scores against. */
+  function segmentations(stemWord) {
+    const out = [];
+    matchPrefixes(stemWord, 2).forEach(pre => {
+      matchSuffixes(pre.rest, 3).forEach(suf => {
         const stem = suf.rest;
         if (stem.length < 2) return;
         const rootMatch = matchRoot(stem);
-        const score = scoreCandidate(stemWord, pre, suf, rootMatch);
-        if (score > 0 && (!best || score > best.score)) {
-          best = { pre, suf, rootMatch, score, stem };
-        }
+        const base = scoreCandidate(stemWord, pre, suf, rootMatch);
+        if (base <= 0) return;
+        const cand = { pre, suf, rootMatch, stem, baseScore: base, score: base };
+        cand.features = featuresOf(cand);
+        out.push(cand);
       });
     });
+    return out;
+  }
+
+  /* Sparse feature vector describing a candidate reading. The learner keeps a
+   * weight per feature; nothing here depends on any external model. */
+  function featuresOf(cand) {
+    const f = Object.create(null);
+    const add = (k, v) => { f[k] = (f[k] || 0) + v; };
+    cand.pre.parts.forEach(p => { if (p.entry) add("P:" + p.entry.id, 1); });
+    cand.suf.parts.forEach(p => { if (p.entry) add("S:" + p.entry.id, 1); });
+    if (cand.rootMatch && cand.rootMatch.entry) add("R:" + cand.rootMatch.entry.id, 1);
+    add("npre:" + cand.pre.parts.length, 1);
+    add("nsuf:" + cand.suf.parts.length, 1);
+    const leftover =
+      ((cand.rootMatch && cand.rootMatch.extra) || "").length +
+      ((cand.rootMatch && cand.rootMatch.lead) || "").length;
+    add("left:" + Math.min(leftover, 3), 1);
+    if (cand.rootMatch && cand.rootMatch.score >= 100) add("exact", 1);
+    if (cand.rootMatch) add("rlen:" + Math.min(cand.rootMatch.form.length, 7), 1);
+    return f;
+  }
+
+  /* The learner installs itself here; with no learner this stays a no-op and
+   * the splitter behaves exactly as the pure heuristic did. */
+  let adaptiveScorer = null;
+  function setScorer(fn) {
+    adaptiveScorer = typeof fn === "function" ? fn : null;
+  }
+
+  function finalScore(cand) {
+    if (!adaptiveScorer) return cand.baseScore;
+    return cand.baseScore + adaptiveScorer(cand.features);
+  }
+
+  function bestOf(cands) {
+    let best = null;
+    cands.forEach(c => {
+      c.score = finalScore(c);
+      if (!best || c.score > best.score) best = c;
+    });
     return best;
+  }
+
+  /* Best reading of a single spelling, or null. */
+  function bestSegmentation(stemWord) {
+    return bestOf(segmentations(stemWord));
   }
 
   /* Candidate base forms after removing a regular ending: plain, with a
@@ -983,11 +1050,88 @@
     return { word, parts, confidence: "medium", affixOnly: true };
   }
 
-  function split(rawWord) {
+  /* Turn a scored candidate into the display parts the app renders. */
+  function partsOf(cand) {
+    const parts = [];
+    cand.pre.parts.forEach(p =>
+      parts.push({
+        kind: "prefix",
+        text: p.form,
+        entry: p.entry,
+        meaning: p.entry ? p.entry.meaning : "",
+        alternates: lookupAll("prefix", p.form)
+      })
+    );
+    if (cand.rootMatch.lead) {
+      parts.push({ kind: "link", text: cand.rootMatch.lead, entry: null, meaning: "connecting letters" });
+    }
+    parts.push({
+      kind: "root",
+      text: cand.rootMatch.surface || (cand.rootMatch.form + (cand.rootMatch.extra || "")),
+      entry: cand.rootMatch.entry,
+      meaning: cand.rootMatch.entry.meaning,
+      alternates: lookupAll("root", cand.rootMatch.form)
+    });
+    cand.suf.parts.forEach(p =>
+      parts.push({
+        kind: "suffix",
+        text: p.form,
+        entry: p.entry,
+        meaning: p.entry ? p.entry.meaning : "",
+        alternates: lookupAll("suffix", p.form)
+      })
+    );
+    return parts;
+  }
+
+  /* A stable identity for a reading, so two candidates can be compared and a
+   * user's pick can be stored and matched again later. */
+  function signature(parts) {
+    return parts.map(p => p.kind[0] + ":" + p.text).join("+");
+  }
+
+  /* Every candidate for a word, best first — the ranked list the user picks
+   * from when correcting the splitter, and the pool the learner trains on. */
+  function candidates(rawWord, limit) {
+    const word = String(rawWord || "").toLowerCase().trim();
+    if (!word) return [];
+    const seen = new Set();
+    const out = [];
+    const collect = (cands, base, inflection) => {
+      cands.forEach(c => {
+        c.score = finalScore(c);
+        const parts = partsOf(c);
+        const sig = signature(parts);
+        if (seen.has(sig)) return;
+        seen.add(sig);
+        out.push({
+          word,
+          base,
+          parts,
+          signature: sig,
+          score: c.score,
+          baseScore: c.baseScore,
+          features: c.features,
+          inflection: inflection || null
+        });
+      });
+    };
+    collect(segmentations(word), word, null);
+    inflectionBases(word).forEach(cand => {
+      collect(segmentations(cand.base), cand.base, cand.inflection);
+    });
+    out.sort((a, b) => b.score - a.score);
+    return limit ? out.slice(0, limit) : out;
+  }
+
+  function split(rawWord, opts) {
+    const options = opts || {};
     const word = String(rawWord || "").toLowerCase().trim();
     if (!word) return { word, parts: [], confidence: "none" };
 
-    if (OVERRIDES[word]) return fromOverride(word, OVERRIDES[word]);
+    if (!options.ignoreOverrides && OVERRIDES[word]) {
+      return fromOverride(word, OVERRIDES[word]);
+    }
 
     let stemWord = word;
     let inflection = null;
@@ -996,7 +1140,7 @@
     /* An inflected form often hides the real morphology ("unprecedented"),
      * so also read the uninflected base and keep whichever explains more. */
     for (const cand of inflectionBases(word)) {
-      if (OVERRIDES[cand.base]) {
+      if (!options.ignoreOverrides && OVERRIDES[cand.base]) {
         const res = fromOverride(cand.base, OVERRIDES[cand.base]);
         if (res.parts.length > 1) {
           res.word = word;
@@ -1024,39 +1168,11 @@
       };
     }
 
-    const parts = [];
-    best.pre.parts.forEach(p =>
-      parts.push({
-        kind: "prefix",
-        text: p.form,
-        entry: p.entry,
-        meaning: p.entry ? p.entry.meaning : "",
-        alternates: lookupAll("prefix", p.form)
-      })
-    );
-    if (best.rootMatch.lead) {
-      parts.push({ kind: "link", text: best.rootMatch.lead, entry: null, meaning: "connecting letters" });
-    }
-    parts.push({
-      kind: "root",
-      text: best.rootMatch.form + (best.rootMatch.extra || ""),
-      entry: best.rootMatch.entry,
-      meaning: best.rootMatch.entry.meaning,
-      alternates: lookupAll("root", best.rootMatch.form)
-    });
-    best.suf.parts.forEach(p =>
-      parts.push({
-        kind: "suffix",
-        text: p.form,
-        entry: p.entry,
-        meaning: p.entry ? p.entry.meaning : "",
-        alternates: lookupAll("suffix", p.form)
-      })
-    );
-
+    const parts = partsOf(best);
     return {
       word,
       parts,
+      signature: signature(parts),
       confidence: best.score >= 110 ? "high" : best.score >= 80 ? "medium" : "low",
       score: best.score,
       inflection
@@ -1078,5 +1194,13 @@
     return bits.join(" → ");
   }
 
-  window.WordSplitter = { split, literalReading, registerWords, OVERRIDES };
+  window.WordSplitter = {
+    split,
+    candidates,
+    signature,
+    literalReading,
+    registerWords,
+    setScorer,
+    OVERRIDES
+  };
 })();

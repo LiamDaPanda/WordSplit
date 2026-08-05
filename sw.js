@@ -1,7 +1,7 @@
 /* WordSplit service worker — precache the whole app so it runs with no
  * network at all once it has been added to the Home Screen. */
 
-const CACHE = "wordsplit-v1";
+const CACHE = "wordsplit-v2";
 
 const ASSETS = [
   "./",
@@ -10,6 +10,8 @@ const ASSETS = [
   "./css/styles.css",
   "./js/morphemes.js",
   "./js/splitter.js",
+  "./js/weights.js",
+  "./js/learn.js",
   "./js/store.js",
   "./js/app.js",
   "./js/data/ssat.js",

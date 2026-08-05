@@ -428,3 +428,43 @@ button, input, select { font: inherit; color: inherit; }
 @media (prefers-reduced-motion: reduce) {
   * { animation-duration: 0.01ms !important; transition-duration: 0.01ms !important; }
 }
+
+/* ---------- teaching the splitter ---------- */
+
+.teach {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 14px;
+  padding-top: 12px;
+  border-top: 1px solid var(--line);
+}
+.teachBtns { display: flex; gap: 8px; }
+.small.ok { color: var(--good); font-weight: 600; }
+
+.pill {
+  padding: 7px 12px;
+  border-radius: 999px;
+  border: 1px solid var(--line);
+  background: var(--bg-elev2);
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  color: inherit;
+}
+.pill:active { transform: scale(0.97); }
+.pill:disabled { opacity: 0.5; cursor: default; }
+
+.altPanel {
+  margin: 0 0 14px;
+  padding: 14px;
+  border: 1px solid var(--accent);
+  border-radius: var(--radius);
+  background: var(--accent-soft);
+}
+.altPanel .sectionTitle { margin-top: 0; }
+
+.weightList { margin: 0; padding-left: 18px; font-size: 13px; }
+.weightList li { margin-bottom: 3px; }
