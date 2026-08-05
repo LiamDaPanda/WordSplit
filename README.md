@@ -2,6 +2,11 @@
 
 **Live: https://liamdapanda.github.io/WordSplit/**
 
+Published straight from `main` by GitHub Pages — the app is static, so there is
+no build step. To point Pages at `main`: **Settings → Pages → Source: Deploy
+from a branch → `main` / `(root)`**. The `.nojekyll` file keeps Pages from
+running the tree through Jekyll.
+
 An Add-to-Home-Screen vocabulary app for the **Upper Level SSAT** and the **SAT**.
 Instead of asking you to memorize definitions cold, WordSplit breaks each word
 into its prefix, root, and suffix, tells you what each piece means, and shows how
@@ -179,7 +184,7 @@ manifest.webmanifest    PWA metadata
 icons/                  app icons, including a maskable variant
 tools/train.js          regenerates js/weights.js
 tools/evaluate.js       measures whether the model helps
-.github/workflows/      publishes main to GitHub Pages
+.nojekyll               serves the tree as-is on GitHub Pages
 ```
 
 Regenerate the shipped model after changing the morpheme database, the scoring,
