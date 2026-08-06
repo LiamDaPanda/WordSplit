@@ -24,7 +24,7 @@ function loadApp() {
     removeItem: k => { delete store[k]; }
   };
   global.window = {};
-  ["js/morphemes.js", "js/splitter.js", "js/data/core.js", "js/data/ssat.js", "js/data/sat.js", "js/learn.js"]
+  ["js/morphemes.js", "js/splitter.js", "js/data/core.js", "js/data/ssat.js", "js/learn.js"]
     .forEach(f => eval(fs.readFileSync(path.join(ROOT, f), "utf8")));
   return global.window;
 }
@@ -78,7 +78,7 @@ function main() {
   const L = W.WordLearner;
 
   const words = [...new Set(
-    [].concat(W.WS_LIST_CORE, W.WS_LIST_SSAT, W.WS_LIST_SAT).map(line => line.split("|")[0])
+    [].concat(W.WS_LIST_CORE, W.WS_LIST_SSAT).map(line => line.split("|")[0])
   )];
   S.registerWords(words);
   L._clearAll();

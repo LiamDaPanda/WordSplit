@@ -22,7 +22,7 @@ the default branch under Settings → Branches. If Source is set to *GitHub
 Actions*, a workflow is required and branch pushes will not publish on their
 own.
 
-An Add-to-Home-Screen vocabulary app for the **Upper Level SSAT** and the **SAT**.
+An Add-to-Home-Screen vocabulary app for the **Upper Level SSAT**.
 Instead of asking you to memorize definitions cold, WordSplit breaks each word
 into its prefix, root, and suffix, tells you what each piece means, and shows how
 those pieces add up to the definition.
@@ -37,19 +37,17 @@ Once you know that `cred` means "believe", you get *credible*, *credence*,
 
 | | |
 |---|---|
-| **Everyday & Academic list** | 2,442 words with definitions |
-| **Upper Level SSAT list** | 1,508 words with definitions |
-| **SAT list** | 1,613 words with definitions |
-| **Unique words total** | 4,962 |
+| **Upper Level SSAT list** | 4,822 words — the one study list |
+| **Dictionary backing** | 2,442 further everyday and academic words |
+| **Words the app knows** | 7,176 |
 | **Word parts** | 93 prefixes, 439 roots, 135 suffixes |
 
 Every word carries a part of speech and a plain-language definition. The word
 parts each carry a meaning, a language of origin, and classic example words.
 
-The Everyday & Academic list is not a test list — it is the ordinary vocabulary
-around them, so that looking a word up returns a definition instead of a blank,
-and so the splitter has a dictionary wide enough to tell a real word from a
-typo.
+There is one study list. The everyday words are loaded but never drilled — they
+exist so that looking a word up returns a definition instead of a blank, and so
+the splitter has a vocabulary wide enough to tell a real word from a typo.
 
 ## Features
 
@@ -95,8 +93,8 @@ one (new / shaky / learning / mastered), with a detail page per word.
 **Roots** — browse the whole morpheme database on its own, searchable by
 spelling or meaning.
 
-**Settings** — pick which lists are in rotation (any mix of the three), session
-length, hardest-words-first ordering, part hints, spoken words, and
+**Settings** — session length, hardest-words-first ordering, part hints,
+spoken words, and
 light/dark/system theme. Auto-advance is **off** by default so an answer and its
 breakdown stay on screen until you tap Next; it can be set to 3, 5, or 8
 seconds. Adaptive splitting can be turned off, and both progress and learned
@@ -115,7 +113,7 @@ network, no tracking.
    and works with no connection at all.
 
 A service worker precaches every asset on first load, so after one visit the
-app is fully offline: all 4,962 words and 667 word parts live on the device.
+app is fully offline: all 7,176 words and 667 word parts live on the device.
 
 ## A splitter that learns
 
@@ -152,8 +150,8 @@ with the override table bypassed so the splitter has to derive each reading:
 
 | | exact-match accuracy |
 |---|---|
-| Hand-written rules alone | 68.6% |
-| With the shipped model | **75.3%** |
+| Hand-written rules alone | 68.4% |
+| With the shipped model | **75.5%** |
 | Held out: train on half, test on the half it never saw | 69.3% → **73.3%** |
 
 The held-out row is the honest one — it shows corrections carrying to unseen
@@ -199,7 +197,7 @@ HTTPS; opening `index.html` via `file://` won't register the worker.
 4. Fall back to an affix-only reading when there's no classical root but a real
    English base is left over (`be + moan`, `boor + ish`).
 
-About 80% of the SSAT and SAT words split into two or more meaningful parts.
+About 85% of the SSAT words split into two or more meaningful parts.
 The everyday list is far lower, around 45%, which is the point: *cat*, *run*,
 and *table* have no classical parts, and the app says so rather than inventing a
 breakdown. The same goes for *aegis*, *balm*, and *coup*.
@@ -225,9 +223,8 @@ js/morphemes.js         667 prefixes, roots, and suffixes
 js/splitter.js          segmentation engine and override table
 js/weights.js           the learned model the app ships with (generated)
 js/learn.js             perceptron: trains on corrections, on the device
-js/data/core.js         everyday and academic words
-js/data/ssat.js         Upper Level SSAT words
-js/data/sat.js          SAT words
+js/data/ssat.js         Upper Level SSAT words — the study list
+js/data/core.js         everyday words, dictionary backing only
 js/store.js             settings, progress, high scores, Leitner scheduling
 js/game.js              the three games in the Play tab
 js/app.js               views and study modes

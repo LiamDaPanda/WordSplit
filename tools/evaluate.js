@@ -17,7 +17,7 @@ const fs = require("fs");
 const path = require("path");
 
 const ROOT = path.join(__dirname, "..");
-const FILES = ["js/morphemes.js", "js/splitter.js", "js/data/core.js", "js/data/ssat.js", "js/data/sat.js"];
+const FILES = ["js/morphemes.js", "js/splitter.js", "js/data/core.js", "js/data/ssat.js"];
 
 function loadApp(withWeights) {
   const store = {};
@@ -35,7 +35,7 @@ function loadApp(withWeights) {
   files.forEach(f => eval(fs.readFileSync(path.join(ROOT, f), "utf8")));
   const W = global.window;
   const words = [...new Set(
-    [].concat(W.WS_LIST_CORE, W.WS_LIST_SSAT, W.WS_LIST_SAT).map(line => line.split("|")[0])
+    [].concat(W.WS_LIST_CORE, W.WS_LIST_SSAT).map(line => line.split("|")[0])
   )];
   W.WordSplitter.registerWords(words);
   return { W, words };

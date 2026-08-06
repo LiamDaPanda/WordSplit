@@ -9,7 +9,6 @@
   const GAMES_KEY = "wordsplit.games.v1";
 
   const DEFAULT_SETTINGS = {
-    lists: ["ssat"],
     sessionLength: 20,
     theme: "system",
     showHints: true,

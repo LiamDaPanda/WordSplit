@@ -6,17 +6,28 @@
   const MORPHEMES = window.WS_MORPHEMES;
   const ORIGIN_NAMES = window.WS_ORIGIN_NAMES;
 
-  const LISTS = {
-    core: { name: "Everyday & Academic", raw: window.WS_LIST_CORE || [] },
-    ssat: { name: "Upper Level SSAT", raw: window.WS_LIST_SSAT || [] },
-    sat: { name: "SAT", raw: window.WS_LIST_SAT || [] }
+  /* One study list. The everyday words are still loaded, but only as
+   * dictionary backing: they give definitions for words people look up and
+   * give the splitter a wide enough vocabulary to tell a real word from a
+   * typo. They are never drilled. */
+  const STUDY_LIST = {
+    key: "ssat",
+    name: "Upper Level SSAT",
+    raw: window.WS_LIST_SSAT || []
   };
+  const DICTIONARY_LIST = {
+    key: "core",
+    name: "Everyday & Academic",
+    raw: window.WS_LIST_CORE || []
+  };
+  const LISTS = { ssat: STUDY_LIST, core: DICTIONARY_LIST };
 
   const POS_NAMES = { n: "noun", v: "verb", adj: "adjective", adv: "adverb" };
 
   /* word -> {word, pos, def, lists[]} across every list, built once */
   const ALL_WORDS = new Map();
-  Object.keys(LISTS).forEach(key => {
+  [STUDY_LIST, DICTIONARY_LIST].forEach(list => {
+    const key = list.key;
     LISTS[key].words = [];
     LISTS[key].raw.forEach(line => {
       const [word, pos, def] = line.split("|");
@@ -48,18 +59,9 @@
     }[c]));
   }
 
+  /* Everything that is studied, played, and browsed. */
   function activeWords() {
-    const lists = Store.getSettings().lists;
-    const seen = new Set();
-    const out = [];
-    lists.forEach(key => {
-      (LISTS[key] ? LISTS[key].words : []).forEach(w => {
-        if (seen.has(w)) return;
-        seen.add(w);
-        out.push(w);
-      });
-    });
-    return out.length ? out : [...ALL_WORDS.keys()];
+    return STUDY_LIST.words.length ? STUDY_LIST.words : [...ALL_WORDS.keys()];
   }
 
   /* Regular endings, so a definition can be found for a form the dictionary
@@ -1088,16 +1090,14 @@
     const stats = Store.getStats();
 
     view.innerHTML =
-      '<div class="sectionTitle">Word lists</div><div class="card">' +
-      Object.keys(LISTS).map(key =>
-        settingSwitch(
-          "list-" + key,
-          LISTS[key].name,
-          LISTS[key].words.length + " words",
-          s.lists.indexOf(key) !== -1
-        )
-      ).join("") +
-      "</div>" +
+      '<div class="sectionTitle">Word list</div><div class="card">' +
+      '<p class="defRow" style="margin-top:0"><span class="defLabel">Studying:</span>' +
+      '<span class="defText"><b>' + esc(STUDY_LIST.name) + "</b> — " +
+      STUDY_LIST.words.length.toLocaleString() + " words</span></p>" +
+      '<p class="small muted" style="margin-bottom:0">A further ' +
+      DICTIONARY_LIST.words.length.toLocaleString() + " everyday words back the " +
+      "dictionary so lookups return a definition and the splitter can tell a " +
+      "real word from a typo. They are not studied.</p></div>" +
 
       '<div class="sectionTitle">Session</div><div class="card">' +
       '<div class="settingRow"><div><div class="sname">Words per session</div>' +
@@ -1146,22 +1146,6 @@
       "with no connection — all " + ALL_WORDS.size + " words and " +
       (MORPHEMES.prefix.length + MORPHEMES.root.length + MORPHEMES.suffix.length) +
       " word parts are stored on the device.</p></div>";
-
-    Object.keys(LISTS).forEach(key => {
-      document.getElementById("list-" + key).addEventListener("change", e => {
-        const lists = Store.getSettings().lists.slice();
-        const at = lists.indexOf(key);
-        if (e.target.checked && at === -1) lists.push(key);
-        if (!e.target.checked && at !== -1) lists.splice(at, 1);
-        if (!lists.length) {
-          e.target.checked = true;
-          toast("Keep at least one list on");
-          return;
-        }
-        Store.setSetting("lists", lists);
-        toast("Word list updated");
-      });
-    });
 
     document.getElementById("autoAdvanceMs").addEventListener("change", e => {
       Store.setSetting("autoAdvanceMs", parseInt(e.target.value, 10));
