@@ -835,6 +835,26 @@
     input.focus();
   }
 
+  /* ---------- view: play ---------- */
+
+  const Games = window.WordGames || null;
+  if (Games) {
+    Games.mount({
+      esc, shuffle, sample, toast, stat, splitHTML, showWordDetail,
+      activeWords, ALL_WORDS, Store, Splitter, MORPHEMES
+    });
+  }
+
+  function renderPlay() {
+    viewTitle.textContent = "Play";
+    if (!Games) {
+      view.innerHTML = '<div class="empty"><span class="bigEmoji">🎮</span>' +
+        "Games are unavailable.</div>";
+      return;
+    }
+    Games.render(view);
+  }
+
   /* ---------- view: browse ---------- */
 
   function renderBrowse() {
@@ -952,8 +972,9 @@
       return;
     }
 
+    /* only the split reading picker owns this; game answers are data-answer */
     const pick = e.target.closest("[data-pick]");
-    if (!pick) return;
+    if (!pick || state.view === "play") return;
     const word = pick.dataset.pickWord;
     const changed = Learner.learnFromChoice(word, pick.dataset.pick);
     toast(changed ? "Learned — thanks" : "Could not use that reading");
@@ -1254,6 +1275,7 @@
   const VIEWS = {
     split: renderSplit,
     study: renderStudy,
+    play: renderPlay,
     browse: renderBrowse,
     roots: renderRoots,
     settings: renderSettings
@@ -1262,6 +1284,8 @@
   function go(name) {
     state.view = name;
     if (name !== "study") state.session = null;
+    /* a running game clock would otherwise keep ticking into the next view */
+    if (name !== "play" && Games) Games.stop();
     tabbar.querySelectorAll(".tab").forEach(tab => {
       tab.setAttribute("aria-current", tab.dataset.view === name ? "true" : "false");
     });

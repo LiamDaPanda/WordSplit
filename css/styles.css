@@ -532,3 +532,135 @@ button, input, select { font: inherit; color: inherit; }
 .view { padding-top: 20px; }
 .settingRow { padding: 15px 0; gap: 16px; }
 .settingRow .sdesc { margin-top: 4px; line-height: 1.4; }
+
+/* ---------- Play ---------- */
+
+.mBest {
+  display: block;
+  margin-top: 6px;
+  font-size: 12px;
+  color: var(--text-dim);
+  letter-spacing: 0.01em;
+}
+.mBest b { color: var(--accent); font-size: 13px; }
+
+/* the clock reads as a draining bar rather than a number to squint at */
+.timeTrack {
+  height: 8px;
+  border-radius: 999px;
+  background: var(--bg-elev2);
+  overflow: hidden;
+  margin-bottom: 12px;
+}
+.timeTrack > i {
+  display: block;
+  height: 100%;
+  background: linear-gradient(90deg, var(--bad), #fbbf24 45%, var(--good));
+  transition: width 0.12s linear;
+}
+
+.gameBar {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 14px;
+  font-size: 15px;
+  font-weight: 700;
+}
+.gameBar .score {
+  margin-left: auto;
+  font-size: 22px;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.01em;
+}
+.gameBar .lives { letter-spacing: 2px; }
+.gameBar .combo {
+  color: var(--accent);
+  background: var(--accent-soft);
+  padding: 3px 10px;
+  border-radius: 999px;
+  font-size: 12.5px;
+}
+
+/* a brief, non-blocking verdict so a fast round still gives feedback */
+.flash {
+  position: fixed;
+  left: 50%;
+  top: 38%;
+  transform: translate(-50%, -50%);
+  font-size: 30px;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+  pointer-events: none;
+  z-index: 70;
+  animation: flashPop 0.7s ease forwards;
+}
+.flash.ok { color: var(--good); }
+.flash.no { color: var(--bad); }
+@keyframes flashPop {
+  0% { opacity: 0; transform: translate(-50%, -35%) scale(0.85); }
+  25% { opacity: 1; transform: translate(-50%, -50%) scale(1.04); }
+  70% { opacity: 1; }
+  100% { opacity: 0; transform: translate(-50%, -62%) scale(1); }
+}
+
+.missCard {
+  margin-top: 12px;
+  padding: 12px 14px;
+  border-radius: 12px;
+  background: rgba(248, 113, 113, 0.12);
+  border: 1px solid rgba(248, 113, 113, 0.4);
+  font-size: 14px;
+  line-height: 1.5;
+}
+
+.bestTag {
+  margin: 2px 0 0;
+  font-weight: 700;
+  color: var(--good);
+  letter-spacing: 0.02em;
+}
+
+/* ---------- Build It tiles ---------- */
+
+.slotRow {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin-top: 16px;
+  min-height: 54px;
+  padding: 10px;
+  border-radius: 12px;
+  border: 1px dashed var(--line);
+  background: var(--bg-elev2);
+}
+.slotHint { color: var(--text-dim); font-size: 13px; }
+
+.tileTray {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 9px;
+  margin-top: 4px;
+}
+
+.tile {
+  padding: 11px 15px;
+  border-radius: 12px;
+  border: 1px solid var(--line);
+  background: var(--bg-elev);
+  color: inherit;
+  font: inherit;
+  font-size: 17px;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  cursor: pointer;
+  transition: transform 0.06s ease, opacity 0.15s ease;
+}
+.tile:active { transform: scale(0.96); }
+.tile:disabled { opacity: 0.28; cursor: default; }
+.tile.placed {
+  background: var(--accent-soft);
+  border-color: var(--accent);
+  color: var(--accent);
+}

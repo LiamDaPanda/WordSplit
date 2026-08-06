@@ -6,6 +6,7 @@
   const SETTINGS_KEY = "wordsplit.settings.v1";
   const PROGRESS_KEY = "wordsplit.progress.v1";
   const STATS_KEY = "wordsplit.stats.v1";
+  const GAMES_KEY = "wordsplit.games.v1";
 
   const DEFAULT_SETTINGS = {
     lists: ["ssat"],
@@ -46,6 +47,7 @@
     { studied: 0, correct: 0, streak: 0, lastDay: null, days: [] },
     read(STATS_KEY, {})
   );
+  let games = read(GAMES_KEY, {});
 
   function getSettings() {
     return Object.assign({}, settings);
@@ -101,6 +103,24 @@
     return Object.assign({}, stats);
   }
 
+  /* Per-game high scores. Returns whether this run beat the record so the
+   * results screen can say so. */
+  function getGameStats() {
+    return Object.assign({}, games);
+  }
+
+  function recordGame(id, value) {
+    const prev = games[id] || { best: 0, played: 0, last: 0 };
+    const isBest = value > prev.best;
+    games[id] = {
+      best: Math.max(prev.best, value),
+      played: prev.played + 1,
+      last: value
+    };
+    write(GAMES_KEY, games);
+    return { best: games[id].best, isBest, played: games[id].played };
+  }
+
   function getProgress() {
     return progress;
   }
@@ -127,8 +147,10 @@
   function resetProgress() {
     progress = {};
     stats = { studied: 0, correct: 0, streak: 0, lastDay: null, days: [] };
+    games = {};
     write(PROGRESS_KEY, progress);
     write(STATS_KEY, stats);
+    write(GAMES_KEY, games);
   }
 
   window.WordStore = {
@@ -138,6 +160,8 @@
     isDue,
     record,
     getStats,
+    getGameStats,
+    recordGame,
     getProgress,
     level,
     summary,

@@ -56,6 +56,20 @@ all, the app says so rather than inventing a breakdown: typing `blorption` gets
 "not in the dictionary", with a **Split it anyway** button if you want the parts
 regardless. Even then, a word built from real parts is explained by them.
 
+**Play** — three games over the same words, scored rather than scheduled.
+Answers still count toward your progress, so playing is real study.
+
+- **Word Rush** — 60 seconds of rapid questions. A combo multiplier builds to
+  ×5 on a clean run; a miss resets it and costs three seconds.
+- **Build It** — a definition and a tray of prefix/root/suffix tiles: assemble
+  the word from its parts. Puzzles are only offered when the tiles genuinely
+  spell the word, so there is always a real answer to find.
+- **Survival** — three lives, no clock, and the field of choices widens the
+  longer you last.
+
+Each keeps a high score on the device, and the results screen lists the words
+you missed so you can tap straight through to them.
+
 **Six study modes**
 
 - **Flashcards** — see the word, recall the meaning, grade yourself. Optional
@@ -206,7 +220,8 @@ js/learn.js             perceptron: trains on corrections, on the device
 js/data/core.js         everyday and academic words
 js/data/ssat.js         Upper Level SSAT words
 js/data/sat.js          SAT words
-js/store.js             settings, progress, Leitner scheduling
+js/store.js             settings, progress, high scores, Leitner scheduling
+js/game.js              the three games in the Play tab
 js/app.js               views and study modes
 sw.js                   offline precache
 manifest.webmanifest    PWA metadata
