@@ -468,3 +468,67 @@ button, input, select { font: inherit; color: inherit; }
 
 .weightList { margin: 0; padding-left: 18px; font-size: 13px; }
 .weightList li { margin-bottom: 3px; }
+
+/* ---------- label / value rows ----------
+   "Meaning: ..." reads as one clumped run when the label and the text sit
+   flush against each other, so every labelled line uses this pair: the label
+   holds its own column and the text gets room to breathe. */
+
+.defRow {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 4px 10px;
+  margin: 10px 0 0;
+  line-height: 1.55;
+}
+.defLabel {
+  flex: none;
+  font-weight: 700;
+  font-size: 12px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--text-dim);
+}
+.defText { flex: 1 1 12ch; min-width: 0; }
+.defRow.small .defText { font-size: 13px; }
+
+.literal {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 4px 10px;
+}
+.literal .defLabel { color: var(--accent); opacity: 0.9; }
+
+/* search row with its own submit button */
+.searchRow { display: flex; gap: 10px; align-items: stretch; }
+.searchRow .field { flex: 1 1 auto; }
+.searchRow .btn { flex: none; padding-left: 20px; padding-right: 20px; }
+
+/* ---------- looser vertical rhythm ----------
+   Titles sat directly on top of their content; these give each block room. */
+
+.wordHead { margin-bottom: 10px; }
+.wordHead .word { line-height: 1.2; }
+.wordHead .pos { margin-left: 10px; }
+
+.pieces { gap: 8px; margin: 18px 0 6px; }
+.piece { padding: 10px 13px; }
+.piece .pieceKind { margin-bottom: 5px; }
+.piece .pieceText { line-height: 1.25; }
+.piece .pieceMeaning { margin-top: 5px; line-height: 1.4; }
+
+.listItem { padding: 14px; gap: 14px; }
+.listItem .lw { line-height: 1.35; }
+.listItem .ld { margin-top: 5px; line-height: 1.45; }
+
+.stat { padding: 15px; }
+.stat .sv { display: block; line-height: 1.15; }
+.stat .sl { display: block; margin-top: 5px; line-height: 1.35; }
+
+.sectionTitle { margin: 24px 0 10px; }
+.card { padding: 18px; }
+.view { padding-top: 20px; }
+.settingRow { padding: 15px 0; gap: 16px; }
+.settingRow .sdesc { margin-top: 4px; line-height: 1.4; }

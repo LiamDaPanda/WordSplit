@@ -48,6 +48,29 @@
     minute: "=",
     second: "=",
     system: "=",
+    /* Everyday words the search would otherwise pull apart at a coincidence:
+     * "cover" is not co + ver (true), "across" is not acr (sharp) + ose.
+     * Left whole, or corrected where the real parts are known. */
+    abate: "=", sinister: "=", across: "=", acid: "=", alarm: "=", angle: "=", angry: "=", armor: "=",
+    article: "=", astonish: "=", average: "=", beverage: "=", body: "=",
+    city: "=", comedian: "=", copy: "=", cover: "=", discover: "=",
+    recover: "=", uncover: "=", eager: "=", enter: "=", environment: "=",
+    estate: "=", evaporate: "=", evening: "=", examine: "=", forever: "=",
+    image: "=", imagine: "=", individual: "=", input: "=", output: "=",
+    label: "=", level: "=", many: "=", marry: "=", medal: "=", mineral: "=",
+    necessary: "=", open: "=", pile: "=", pioneer: "=", quiet: "=",
+    regard: "=", salary: "=", savage: "=", season: "=", secure: "=",
+    seven: "=", several: "=", stage: "=", star: "=", start: "=", stay: "=",
+    steal: "=", steel: "=", steer: "=", sting: "=", storage: "=", story: "=",
+    stress: "=", theory: "=", tiny: "=", under: "=", unite: "=", valley: "=",
+    very: "=", vowel: "=", apparatus: "=", inside: "=",
+    common: "com|mun|",
+    council: "co|cili|",
+    distance: "dis|sta|ance",
+    party: "|part|y",
+    bilingual: "bi|lingu|al",
+    antagonist: "anti|agon|ist",
+
     /* A long suffix must not swallow the tail of the root: these teach the
      * model to keep "cret" over "cre"+"tion", "volut" over "vol"+"ute". */
     convolute: "con|volut|",
@@ -961,17 +984,29 @@
   function inflectionBases(word) {
     const out = [];
     if (word.length <= 4) return out;
+    /* "status" is a word in its own right, so it must not be re-spelled into
+     * "statue" on the way to an analysis. Restoring letters is only allowed
+     * for a form the dictionary does not list. */
+    const mayRestore = !KNOWN_WORDS.has(word);
     INFLECTIONS.forEach(inf => {
       if (!word.endsWith(inf.end)) return;
       const stripped = word.slice(0, word.length - inf.end.length) + inf.replace;
       if (stripped.length < 3) return;
+      /* Plain removal is always fair game. Restoring a letter is a guess, so
+       * it only counts when the result is a word we actually know —
+       * otherwise "possess" becomes "possese" and "species" becomes "specy". */
       const forms = [stripped];
       if (!inf.replace) {
-        forms.push(stripped + "e");
+        if (mayRestore && isRealBase(stripped + "e")) forms.push(stripped + "e");
         const last = stripped[stripped.length - 1];
         if (stripped.length > 3 && last === stripped[stripped.length - 2] && !VOWELS.includes(last)) {
           forms.push(stripped.slice(0, -1));
         }
+      } else if (!mayRestore || !KNOWN_WORDS.has(stripped)) {
+        /* the -ies -> -y swap also invents a letter */
+        const swapped = word.slice(0, word.length - inf.end.length) + inf.replace;
+        forms.length = 0;
+        if (mayRestore && KNOWN_WORDS.has(swapped)) forms.push(swapped);
       }
       forms.forEach(f => out.push({ base: f, inflection: inf }));
     });
@@ -1142,14 +1177,23 @@
     for (const cand of inflectionBases(word)) {
       if (!options.ignoreOverrides && OVERRIDES[cand.base]) {
         const res = fromOverride(cand.base, OVERRIDES[cand.base]);
-        if (res.parts.length > 1) {
-          res.word = word;
-          res.inflection = cand.inflection;
+        res.word = word;
+        res.inflection = cand.inflection;
+        /* "=" on the base means the base is a single unit, so the inflected
+         * form is too — do not fall through and split it anyway. */
+        if (OVERRIDES[cand.base] === "=") {
+          res.parts = [{ kind: "base", text: word, meaning: "", entry: null }];
+          res.inflection = null;
           return res;
         }
+        if (res.parts.length > 1) return res;
         continue;
       }
       const alt = bestSegmentation(cand.base);
+      /* Trading the whole word for a shortened stem has to buy something:
+       * a bare root on a truncated stem ("species" -> "speci") explains less
+       * than leaving the word alone. */
+      if (alt && alt.pre.parts.length + alt.suf.parts.length === 0) continue;
       if (alt && (!best || alt.score > best.score)) {
         best = alt;
         stemWord = cand.base;

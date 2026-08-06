@@ -539,7 +539,9 @@ const ROOTS = [
   "eco,oik|house, environment|G|economy,ecology",
   "herb|plant, grass|L|herbivorous,herbal",
   "arm|weapon, to equip|L|armistice,armament,disarm",
-  "sap,sip,sav|taste, wisdom|L|insipid,savant,sapient"
+  "sap,sip,sav|taste, wisdom|L|insipid,savant,sapient",
+  "lingu,langu|tongue, language|L|bilingual,linguist,language",
+  "agon|contest, struggle|G|antagonist,agony,protagonist"
 ];
 
 const SUFFIXES = [

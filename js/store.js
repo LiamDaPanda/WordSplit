@@ -13,7 +13,7 @@
     theme: "system",
     showHints: true,
     speakWords: false,
-    autoAdvance: true,
+    autoAdvanceMs: 0,
     hardestFirst: false,
     adaptiveSplit: true
   };

@@ -768,6 +768,7 @@ window.WS_LIST_SAT = [
 "incontrovertible|adj|impossible to deny or dispute",
 "incorrigible|adj|not able to be corrected",
 "increment|n|an increase by a fixed amount",
+"incredulous|adj|unwilling or unable to believe something",
 "incriminate|v|to make someone appear guilty",
 "inculcate|v|to instill by persistent instruction",
 "incumbent|adj|necessary as a duty; currently in office",

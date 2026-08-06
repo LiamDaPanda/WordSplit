@@ -22,20 +22,32 @@ Once you know that `cred` means "believe", you get *credible*, *credence*,
 
 | | |
 |---|---|
+| **Everyday & Academic list** | 2,442 words with definitions |
 | **Upper Level SSAT list** | 1,508 words with definitions |
-| **SAT list** | 1,612 words with definitions |
-| **Unique words total** | 2,600 |
-| **Word parts** | 93 prefixes, 437 roots, 136 suffixes |
+| **SAT list** | 1,613 words with definitions |
+| **Unique words total** | 4,962 |
+| **Word parts** | 93 prefixes, 439 roots, 135 suffixes |
 
 Every word carries a part of speech and a plain-language definition. The word
 parts each carry a meaning, a language of origin, and classic example words.
 
+The Everyday & Academic list is not a test list — it is the ordinary vocabulary
+around them, so that looking a word up returns a definition instead of a blank,
+and so the splitter has a dictionary wide enough to tell a real word from a
+typo.
+
 ## Features
 
-**Split** — Type any word, including ones outside the study lists, and see it
-broken apart. Tap any coloured piece to open that prefix/root/suffix and see
-every study word that uses it. There's a word of the day and a random-word
-button.
+**Split** — Type a word and press **Split** (or Enter) to see it broken apart.
+Tap any coloured piece to open that prefix/root/suffix and see every study word
+that uses it. There's a word of the day and a random-word button.
+
+A definition always appears. If the word is an inflected form the dictionary
+does not list, the base word's meaning stands in, labelled — *duties* shows
+"plural of **duty** — a moral or legal obligation". If the word is not a word at
+all, the app says so rather than inventing a breakdown: typing `blorption` gets
+"not in the dictionary", with a **Split it anyway** button if you want the parts
+regardless. Even then, a word built from real parts is explained by them.
 
 **Six study modes**
 
@@ -54,10 +66,12 @@ one (new / shaky / learning / mastered), with a detail page per word.
 **Roots** — browse the whole morpheme database on its own, searchable by
 spelling or meaning.
 
-**Settings** — pick which lists are in rotation (SSAT, SAT, or both), session
-length, hardest-words-first ordering, part hints, auto-advance, spoken words,
-and light/dark/system theme. Adaptive splitting can be turned off, and both
-progress and learned corrections can be reset.
+**Settings** — pick which lists are in rotation (any mix of the three), session
+length, hardest-words-first ordering, part hints, spoken words, and
+light/dark/system theme. Auto-advance is **off** by default so an answer and its
+breakdown stay on screen until you tap Next; it can be set to 3, 5, or 8
+seconds. Adaptive splitting can be turned off, and both progress and learned
+corrections can be reset.
 
 Progress uses a Leitner box schedule: a correct answer promotes a word and
 pushes its next review out (1, 2, 4, 8, 16, 32 days); a miss sends it back to
@@ -72,7 +86,7 @@ network, no tracking.
    and works with no connection at all.
 
 A service worker precaches every asset on first load, so after one visit the
-app is fully offline: all 2,600 words and 666 word parts live on the device.
+app is fully offline: all 4,962 words and 667 word parts live on the device.
 
 ## A splitter that learns
 
@@ -109,13 +123,13 @@ with the override table bypassed so the splitter has to derive each reading:
 
 | | exact-match accuracy |
 |---|---|
-| Hand-written rules alone | 68.9% |
-| With the shipped model | **76.7%** |
+| Hand-written rules alone | 68.6% |
+| With the shipped model | **75.3%** |
 | Held out: train on half, test on the half it never saw | 69.3% → **73.3%** |
 
 The held-out row is the honest one — it shows corrections carrying to unseen
-words rather than the model memorizing its training set. Split coverage stays
-at 80.2% either way, so the gain is better readings, not more of them.
+words rather than the model memorizing its training set. Split coverage is
+unchanged by learning, so the gain is better readings, not more of them.
 
 Concretely, learning is what turns `con-tra-dict` into `contra-dict`,
 `in-di-gn-ant` into `in-dign-ant`, `ol-fact-or-y` into `ol-fact-ory`, and
@@ -156,9 +170,16 @@ HTTPS; opening `index.html` via `file://` won't register the worker.
 4. Fall back to an affix-only reading when there's no classical root but a real
    English base is left over (`be + moan`, `boor + ish`).
 
-About 80% of the 2,600 study words split into two or more meaningful parts. The
-rest — *aegis*, *balm*, *coup*, *banana* — genuinely have no classical parts, so
-the app says so rather than inventing a breakdown.
+About 80% of the SSAT and SAT words split into two or more meaningful parts.
+The everyday list is far lower, around 45%, which is the point: *cat*, *run*,
+and *table* have no classical parts, and the app says so rather than inventing a
+breakdown. The same goes for *aegis*, *balm*, and *coup*.
+
+Two rules keep the search from mangling ordinary words. Parts must reconstruct
+the word, so a reading may never quietly add or drop a letter — *possess* is not
+allowed to become *possese* on the way to an analysis. And a regular ending is
+only peeled off when doing so buys something: *species* keeps its own spelling
+rather than being read as a plural of *speci*.
 
 An override table handles words whose real history disagrees with a greedy
 match (`reticent` is `re` + `tac` + `ent`, not `retic` + `ent`) and blocks
@@ -171,10 +192,11 @@ meaning.
 ```
 index.html              app shell and tab bar
 css/styles.css          iOS-first styling, light and dark
-js/morphemes.js         666 prefixes, roots, and suffixes
+js/morphemes.js         667 prefixes, roots, and suffixes
 js/splitter.js          segmentation engine and override table
 js/weights.js           the learned model the app ships with (generated)
 js/learn.js             perceptron: trains on corrections, on the device
+js/data/core.js         everyday and academic words
 js/data/ssat.js         Upper Level SSAT words
 js/data/sat.js          SAT words
 js/store.js             settings, progress, Leitner scheduling

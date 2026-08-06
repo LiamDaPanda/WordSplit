@@ -7,6 +7,7 @@
   const ORIGIN_NAMES = window.WS_ORIGIN_NAMES;
 
   const LISTS = {
+    core: { name: "Everyday & Academic", raw: window.WS_LIST_CORE || [] },
     ssat: { name: "Upper Level SSAT", raw: window.WS_LIST_SSAT || [] },
     sat: { name: "SAT", raw: window.WS_LIST_SAT || [] }
   };
@@ -59,6 +60,49 @@
       });
     });
     return out.length ? out : [...ALL_WORDS.keys()];
+  }
+
+  /* Regular endings, so a definition can be found for a form the dictionary
+   * does not list directly ("abating" -> "abate", "duties" -> "duty"). */
+  const ENDINGS = [
+    { end: "ies", add: ["y"], note: "plural of" },
+    { end: "ied", add: ["y"], note: "past tense of" },
+    { end: "ing", add: ["", "e"], note: "the -ing form of" },
+    { end: "es", add: ["", "e"], note: "plural of" },
+    { end: "ed", add: ["", "e"], note: "past tense of" },
+    { end: "est", add: ["", "e"], note: "the superlative of" },
+    { end: "er", add: ["", "e"], note: "the comparative of" },
+    { end: "ly", add: ["", "e"], note: "the adverb from" },
+    { end: "s", add: [""], note: "plural of" }
+  ];
+
+  /* Find a definition for any word: the entry itself, or the entry for the
+   * form it is built from. Returns null only when the word is unknown. */
+  function lookupWord(raw) {
+    const word = String(raw || "").toLowerCase().trim();
+    if (!word) return null;
+
+    const direct = ALL_WORDS.get(word);
+    if (direct) return { word, rec: direct, base: word, note: null };
+
+    for (const rule of ENDINGS) {
+      if (!word.endsWith(rule.end)) continue;
+      const stem = word.slice(0, word.length - rule.end.length);
+      if (stem.length < 2) continue;
+      const forms = rule.add.map(a => stem + a);
+      /* a final -y becomes -i before some endings ("happy" -> "happiest") */
+      if (stem.endsWith("i")) forms.push(stem.slice(0, -1) + "y");
+      /* a doubled final consonant is dropped before -ing/-ed ("running") */
+      const last = stem[stem.length - 1];
+      if (stem.length > 3 && last === stem[stem.length - 2] && "bdfglmnprt".includes(last)) {
+        forms.push(stem.slice(0, -1));
+      }
+      for (const form of forms) {
+        const rec = ALL_WORDS.get(form);
+        if (rec) return { word, rec, base: form, note: rule.note };
+      }
+    }
+    return null;
   }
 
   function shuffle(arr) {
@@ -114,7 +158,8 @@
   function splitHTML(word, opts) {
     const options = opts || {};
     const result = Splitter.split(word);
-    const rec = ALL_WORDS.get(word);
+    const found = lookupWord(word);
+    const rec = found ? found.rec : null;
     let html = "";
 
     if (options.showWord !== false) {
@@ -123,8 +168,34 @@
         html += '<span class="pos">' + esc(POS_NAMES[rec.pos] || rec.pos) + "</span>";
       }
       html += "</div>";
-      if (rec && options.showDefinition !== false) {
-        html += '<p class="definition">' + esc(rec.def) + "</p>";
+
+      if (options.showDefinition !== false) {
+        /* A definition always appears. If the word is an inflected form, the
+         * base word's meaning stands in, labelled so it is not a surprise. */
+        if (rec && found.note) {
+          html +=
+            '<p class="defRow"><span class="defLabel">Meaning:</span>' +
+            '<span class="defText">' + esc(found.note) + " <b>" + esc(found.base) +
+            "</b> — " + esc(rec.def) + "</span></p>";
+        } else if (rec) {
+          html +=
+            '<p class="defRow"><span class="defLabel">Meaning:</span>' +
+            '<span class="defText">' + esc(rec.def) + "</span></p>";
+        } else {
+          /* No dictionary entry, but if the parts are real the word can
+           * still be explained by what they mean — which is the whole
+           * premise of the app, so it should not go blank here. */
+          const literal = Splitter.literalReading(result);
+          html +=
+            '<p class="defRow"><span class="defLabel">Meaning:</span>' +
+            '<span class="defText muted">' +
+            (literal
+              ? "Not in the dictionary, but its parts read as <b>" +
+                esc(literal) + "</b>."
+              : "Not in the dictionary — this may be a typo, or a word " +
+                "WordSplit has not learned yet.") +
+            "</span></p>";
+        }
       }
     }
 
@@ -138,14 +209,17 @@
 
       if (result.inflection) {
         html +=
-          '<p class="small muted">Ending <b>' + esc(result.inflection.label) +
-          "</b> — " + esc(result.inflection.note) + ", removed to show the base.</p>";
+          '<p class="defRow small"><span class="defLabel">Ending:</span>' +
+          '<span class="defText muted"><b>' + esc(result.inflection.label) +
+          "</b> — " + esc(result.inflection.note) +
+          ", removed to show the base.</span></p>";
       }
 
       const literal = Splitter.literalReading(result);
       if (literal) {
         html +=
-          '<div class="literal">Read the parts: <b>' + esc(literal) + "</b></div>";
+          '<div class="literal"><span class="defLabel">Read the parts:</span>' +
+          '<span class="defText"><b>' + esc(literal) + "</b></span></div>";
       }
     } else {
       html +=
@@ -160,8 +234,8 @@
       const shared = relatedWords(word, result);
       if (shared.length) {
         html +=
-          '<p class="examples"><b>Same roots:</b> ' +
-          shared.map(w => esc(w)).join(", ") + "</p>";
+          '<p class="defRow examples"><span class="defLabel">Same roots:</span>' +
+          '<span class="defText">' + shared.map(w => esc(w)).join(", ") + "</span></p>";
       }
     }
 
@@ -249,8 +323,12 @@
     const daily = words[Math.floor(dayNumber() % words.length)];
 
     view.innerHTML =
+      '<form class="searchRow" id="splitForm">' +
       '<input class="field" id="splitInput" type="search" autocapitalize="none" ' +
-      'autocorrect="off" spellcheck="false" placeholder="Type any word to break apart…">' +
+      'autocorrect="off" spellcheck="false" enterkeyhint="search" ' +
+      'placeholder="Type a word to break apart…">' +
+      '<button class="btn primary" id="splitGo" type="submit">Split</button>' +
+      "</form>" +
       '<div id="splitResult"></div>' +
       '<div class="sectionTitle">Word of the day</div>' +
       '<div class="card" id="dailyCard">' + splitHTML(daily, { allowTeach: true }) + "</div>" +
@@ -259,31 +337,61 @@
     const input = document.getElementById("splitInput");
     const result = document.getElementById("splitResult");
 
-    const run = () => {
+    /* Only real words get broken apart. Typing letters that are not a word
+     * used to produce a confident-looking split of nothing, so an unknown
+     * string now says so and offers the split as an explicit choice. */
+    const run = force => {
       const value = input.value.trim().toLowerCase();
       if (!value) {
         result.innerHTML = "";
         return;
       }
+      if (!/^[a-z][a-z'-]*$/.test(value)) {
+        result.innerHTML =
+          '<div class="card"><p class="muted">Letters only, please — ' +
+          esc(value) + " is not a word.</p></div>";
+        return;
+      }
+
+      const found = lookupWord(value);
+      if (!found && !force) {
+        result.innerHTML =
+          '<div class="card"><div class="wordHead"><span class="word">' +
+          esc(value) + "</span></div>" +
+          '<p class="defRow"><span class="defLabel">Meaning:</span>' +
+          '<span class="defText muted">Not in the dictionary. WordSplit knows ' +
+          ALL_WORDS.size.toLocaleString() + " words — check the spelling, or " +
+          "split it anyway to see which parts it recognizes.</span></p>" +
+          '<button class="btn wide" id="forceSplit" style="margin-top:12px">' +
+          "Split it anyway</button></div>";
+        const force0 = document.getElementById("forceSplit");
+        if (force0) force0.addEventListener("click", () => run(true));
+        return;
+      }
+
       result.innerHTML =
         '<div class="card">' + splitHTML(value, { allowTeach: true }) + "</div>";
-      if (!ALL_WORDS.has(value)) {
+      if (!found) {
         result.innerHTML +=
-          '<p class="small muted center">Not in your word lists — split from the ' +
-          "morpheme database.</p>";
+          '<p class="small muted center">Split from the word parts alone — ' +
+          "this word is not in the dictionary, so treat the reading as a guess.</p>";
       }
     };
 
-    input.addEventListener("input", run);
-    input.addEventListener("search", run);
+    document.getElementById("splitForm").addEventListener("submit", e => {
+      e.preventDefault();
+      input.blur(); /* dismisses the iOS keyboard so the result is visible */
+      run(false);
+    });
+    input.addEventListener("search", () => run(false));
     if (preload) {
       input.value = preload;
-      run();
+      run(false);
     }
     document.getElementById("randomBtn").addEventListener("click", () => {
       const w = words[Math.floor(Math.random() * words.length)];
       input.value = w;
-      run();
+      run(false);
       speak(w);
       window.scrollTo({ top: 0, behavior: "smooth" });
     });
@@ -335,8 +443,8 @@
   }
 
   function stat(value, label) {
-    return '<div class="stat"><div class="sv">' + esc(value) + '</div><div class="sl">' +
-      esc(label) + "</div></div>";
+    return '<div class="stat"><span class="sv">' + esc(value) + '</span>' +
+      '<span class="sl">' + esc(label) + "</span></div>";
   }
 
   let sessionCounter = 0;
@@ -586,13 +694,17 @@
     next.addEventListener("click", () => advance(correct, word));
     next.focus();
 
-    if (Store.getSettings().autoAdvance && correct) {
+    /* Auto-advance is off by default: a right answer still has an
+     * explanation worth reading, and being yanked to the next card mid-
+     * sentence is worse than tapping Next. */
+    const delay = Store.getSettings().autoAdvanceMs || 0;
+    if (delay && correct) {
       const sessionId = state.session.id;
       const at = state.session.index;
       setTimeout(() => {
         const s = state.session;
         if (s && s.id === sessionId && s.index === at && s.answered) advance(true, word);
-      }, 1100);
+      }, delay);
     }
   }
 
@@ -923,10 +1035,12 @@
       '<div class="confidence">' + esc(entry.kind) + " · " +
       esc(ORIGIN_NAMES[entry.origin] || entry.origin) + "</div>" +
       '<div class="wordHead"><span class="word">' + esc(entry.variants.join(", ")) + "</span></div>" +
-      '<p class="definition">' + esc(entry.meaning) + "</p>" +
+      '<p class="defRow"><span class="defLabel">Means:</span>' +
+      '<span class="defText">' + esc(entry.meaning) + "</span></p>" +
       (entry.examples.length
-        ? '<p class="examples"><b>Classic examples:</b> ' +
-          entry.examples.map(e => esc(e)).join(", ") + "</p>"
+        ? '<p class="defRow examples"><span class="defLabel">Examples:</span>' +
+          '<span class="defText">' + entry.examples.map(e => esc(e)).join(", ") +
+          "</span></p>"
         : "") +
       "</div>" +
       (inCorpus.length
@@ -974,7 +1088,15 @@
       "</select></div>" +
       settingSwitch("hardestFirst", "Hardest words first", "Prioritize the ones you keep missing", s.hardestFirst) +
       settingSwitch("showHints", "Show part hints", "Reveal prefix and root clues before you answer", s.showHints) +
-      settingSwitch("autoAdvance", "Auto-advance", "Move on automatically after a correct answer", s.autoAdvance) +
+      '<div class="settingRow"><div><div class="sname">Auto-advance</div>' +
+      '<div class="sdesc">Move on by itself after a correct answer</div></div>' +
+      '<select class="field" id="autoAdvanceMs" style="width:auto">' +
+      [[0, "Off"], [3000, "After 3s"], [5000, "After 5s"], [8000, "After 8s"]].map(
+        ([v, label]) =>
+          '<option value="' + v + '"' +
+          ((s.autoAdvanceMs || 0) === v ? " selected" : "") + ">" + label + "</option>"
+      ).join("") +
+      "</select></div>" +
       settingSwitch("speakWords", "Speak words aloud", "Read each word using the device voice", s.speakWords) +
       "</div>" +
 
@@ -1020,7 +1142,11 @@
       });
     });
 
-    ["hardestFirst", "showHints", "autoAdvance", "speakWords"].forEach(key => {
+    document.getElementById("autoAdvanceMs").addEventListener("change", e => {
+      Store.setSetting("autoAdvanceMs", parseInt(e.target.value, 10));
+    });
+
+    ["hardestFirst", "showHints", "speakWords"].forEach(key => {
       document.getElementById(key).addEventListener("change", e => {
         Store.setSetting(key, e.target.checked);
       });
