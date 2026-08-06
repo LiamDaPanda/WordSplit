@@ -5,14 +5,11 @@
 Served by GitHub Pages straight from the repository — the app is static, so
 there is no build step and `.nojekyll` keeps the tree from going through Jekyll.
 
-Pages is set to **deploy from a branch**, and it builds whichever branch is the
-repository default. To serve `main`, set it once in **Settings → Pages →
-Source: Deploy from a branch → `main` / `(root)`** (or make `main` the default
-branch under Settings → Branches). An Actions-based workflow is deliberately
-*not* used here: the `github-pages` environment is only grantable when the Pages
-source is already "GitHub Actions", `configure-pages` cannot switch a site
-that is already in branch mode, and a workflow holding the `pages` concurrency
-group cancels the real branch build on its way to failing.
+Published from `main` by `.github/workflows/pages.yml`.
+
+One trap worth recording: that workflow must not declare the `pages`
+concurrency group. It is the same group GitHub's own branch-deployment build
+uses, so holding it cancels the real build. It uses `pages-deploy` instead.
 
 An Add-to-Home-Screen vocabulary app for the **Upper Level SSAT** and the **SAT**.
 Instead of asking you to memorize definitions cold, WordSplit breaks each word
