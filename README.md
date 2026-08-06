@@ -2,10 +2,8 @@
 
 **Live: https://liamdapanda.github.io/WordSplit/**
 
-Published straight from `main` by GitHub Pages — the app is static, so there is
-no build step. To point Pages at `main`: **Settings → Pages → Source: Deploy
-from a branch → `main` / `(root)`**. The `.nojekyll` file keeps Pages from
-running the tree through Jekyll.
+Published from `main` by the workflow in `.github/workflows/pages.yml` — the app
+is static, so it uploads the repo root as-is with no build step.
 
 An Add-to-Home-Screen vocabulary app for the **Upper Level SSAT** and the **SAT**.
 Instead of asking you to memorize definitions cold, WordSplit breaks each word
@@ -207,6 +205,7 @@ icons/                  app icons, including a maskable variant
 tools/train.js          regenerates js/weights.js
 tools/evaluate.js       measures whether the model helps
 .nojekyll               serves the tree as-is on GitHub Pages
+.github/workflows/      publishes main to GitHub Pages
 ```
 
 Regenerate the shipped model after changing the morpheme database, the scoring,
