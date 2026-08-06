@@ -5,11 +5,22 @@
 Served by GitHub Pages straight from the repository — the app is static, so
 there is no build step and `.nojekyll` keeps the tree from going through Jekyll.
 
-Published from `main` by `.github/workflows/pages.yml`.
+Pages is configured in repository settings, not in this repo — there is no
+deploy workflow, and adding one does not help. Two things were established the
+hard way and are worth not repeating:
 
-One trap worth recording: that workflow must not declare the `pages`
-concurrency group. It is the same group GitHub's own branch-deployment build
-uses, so holding it cancels the real build. It uses `pages-deploy` instead.
+- A workflow declaring the `pages` concurrency group **cancels GitHub's own
+  branch-deployment build**, because that is the group the built-in build uses.
+- A job declaring the `github-pages` environment is rejected before its first
+  step unless the Pages source is already set to "GitHub Actions", and
+  `configure-pages` with `enablement: true` will not switch a site that is
+  already deploying from a branch — it succeeds as a no-op.
+
+So the source is a settings choice: **Settings → Pages**. To publish `main`,
+either set Source to *Deploy from a branch → `main` / `(root)`*, or make `main`
+the default branch under Settings → Branches. If Source is set to *GitHub
+Actions*, a workflow is required and branch pushes will not publish on their
+own.
 
 An Add-to-Home-Screen vocabulary app for the **Upper Level SSAT** and the **SAT**.
 Instead of asking you to memorize definitions cold, WordSplit breaks each word
