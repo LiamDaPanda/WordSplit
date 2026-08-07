@@ -132,5 +132,164 @@
     return atMost(GAME_OVER, pct) || GAME_OVER[GAME_OVER.length - 1];
   }
 
-  window.WordMemes = { answer, summary, gameOver };
+  /* ---------- your meme library ----------
+   *
+   * The captions above ship with the app. Actual meme images do not, and
+   * deliberately: the well-known ones are photographs and video frames owned
+   * by the people who made them, and bundling them into a repo that is served
+   * publicly would be redistributing someone else's work. Hotlinking is worse
+   * — it breaks the offline promise and spends someone else's bandwidth.
+   *
+   * So the app ships the frame and you fill it. Add whatever memes you like
+   * from the camera roll or a URL; they are stored as blobs in IndexedDB on
+   * this device, which means they work with no connection and never leave it.
+   */
+  const DB_NAME = "wordsplit-memes";
+  const STORE = "memes";
+  let db = null;
+  let loaded = [];
+  let onChange = null;
+
+  function openDB() {
+    return new Promise((resolve, reject) => {
+      if (db) return resolve(db);
+      if (!window.indexedDB) return reject(new Error("no indexeddb"));
+      const req = indexedDB.open(DB_NAME, 1);
+      req.onupgradeneeded = () => {
+        const d = req.result;
+        if (!d.objectStoreNames.contains(STORE)) {
+          d.createObjectStore(STORE, { keyPath: "id", autoIncrement: true });
+        }
+      };
+      req.onsuccess = () => { db = req.result; resolve(db); };
+      req.onerror = () => reject(req.error);
+    });
+  }
+
+  function tx(mode) {
+    return openDB().then(d => d.transaction(STORE, mode).objectStore(STORE));
+  }
+
+  function request(req) {
+    return new Promise((resolve, reject) => {
+      req.onsuccess = () => resolve(req.result);
+      req.onerror = () => reject(req.error);
+    });
+  }
+
+  /* Object URLs are minted once per record and held for the life of the page,
+   * so a card can be rendered synchronously from a string of HTML. */
+  function decorate(rec) {
+    return {
+      id: rec.id,
+      mood: rec.mood || "any",
+      caption: rec.caption || "",
+      name: rec.name || "",
+      url: URL.createObjectURL(rec.blob)
+    };
+  }
+
+  function load() {
+    return tx("readonly")
+      .then(store => request(store.getAll()))
+      .then(rows => {
+        loaded.forEach(m => URL.revokeObjectURL(m.url));
+        loaded = rows.map(decorate);
+        if (onChange) onChange(loaded);
+        return loaded;
+      })
+      .catch(() => {
+        /* private mode, or storage refused — the captions still work */
+        loaded = [];
+        return loaded;
+      });
+  }
+
+  function add(blob, opts) {
+    const o = opts || {};
+    const rec = {
+      blob,
+      mood: o.mood || "any",
+      caption: o.caption || "",
+      name: o.name || "",
+      added: Date.now()
+    };
+    return tx("readwrite").then(store => request(store.add(rec))).then(load);
+  }
+
+  function update(id, patch) {
+    return tx("readwrite")
+      .then(store => request(store.get(id)).then(rec => {
+        if (!rec) return null;
+        return request(store.put(Object.assign(rec, patch)));
+      }))
+      .then(load);
+  }
+
+  function remove(id) {
+    return tx("readwrite").then(store => request(store.delete(id))).then(load);
+  }
+
+  function clear() {
+    return tx("readwrite").then(store => request(store.clear())).then(load);
+  }
+
+  function list() {
+    return loaded.slice();
+  }
+
+  /* A meme for this outcome, or null when the library has nothing that fits.
+   * "any" images are eligible either way, so one uploaded meme still shows. */
+  function pickImage(correct) {
+    const want = correct ? "right" : "wrong";
+    const fits = loaded.filter(m => m.mood === want || m.mood === "any");
+    if (!fits.length) return null;
+    return fits[Math.floor(Math.random() * fits.length)];
+  }
+
+  /* Images are capped so one enormous screenshot cannot eat the device
+   * storage budget and take the word lists down with it. */
+  const MAX_BYTES = 4 * 1024 * 1024;
+
+  function fromFile(file, opts) {
+    if (!file || file.size > MAX_BYTES) {
+      return Promise.reject(new Error("Image is over 4MB"));
+    }
+    if (!/^image\//.test(file.type)) {
+      return Promise.reject(new Error("That is not an image"));
+    }
+    return add(file, Object.assign({ name: file.name }, opts));
+  }
+
+  /* Fetching someone else's image needs their server to allow it. When it
+   * refuses there is nothing to be done from a page, so say so plainly
+   * rather than failing silently — saving the image and picking the file
+   * always works. */
+  function fromURL(url, opts) {
+    return fetch(url, { mode: "cors" })
+      .then(res => {
+        if (!res.ok) throw new Error("Server said " + res.status);
+        return res.blob();
+      })
+      .then(blob => {
+        if (!/^image\//.test(blob.type)) throw new Error("That URL is not an image");
+        if (blob.size > MAX_BYTES) throw new Error("Image is over 4MB");
+        return add(blob, Object.assign({ name: url.split("/").pop() }, opts));
+      })
+      .catch(err => {
+        const msg = /Failed to fetch|NetworkError|CORS/i.test(String(err && err.message))
+          ? "That site will not hand the image to another page. Save it, then add the file."
+          : err.message || "Could not fetch that";
+        throw new Error(msg);
+      });
+  }
+
+  const Library = {
+    load, list, add, update, remove, clear,
+    fromFile, fromURL, pick: pickImage,
+    get count() { return loaded.length; },
+    set onChange(fn) { onChange = fn; }
+  };
+
+  window.WordMemes = { answer, summary, gameOver, Library };
 })();

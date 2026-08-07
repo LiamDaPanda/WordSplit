@@ -99,11 +99,26 @@ Wrong, but bold."* Streaks are noticed, broken streaks are mourned, and the
 first right answer after a miss is a redemption arc. It reads the score at the
 end of a session or a game too.
 
-The captions are text and the faces are the same inline SVGs as everything
-else, so nothing is downloaded and the app stays fully offline. A miss is never
-an insult — the lines tease the moment, not the person — and the caption always
-sits *above* the real feedback, never instead of it. **Settings → Commentary**
-turns the whole thing off.
+A miss is never an insult — the lines tease the moment, not the person — and
+the caption always sits *above* the real feedback, never instead of it.
+**Settings → Commentary** turns the whole thing off.
+
+**Your memes** — the app ships the frame; you fill it. Add images from the
+camera roll or paste an image URL, tag each one to show on a right answer, a
+wrong one, or either, and give it a caption. They then appear as proper meme
+cards — picture with the caption laid over it in the usual heavy outlined type
+— in study, in the games, and on the results screens.
+
+Everything you add is stored as a blob in IndexedDB **on the device**. It works
+with no connection, it is never uploaded, and *Remove all* clears it.
+
+Well-known memes are not bundled, on purpose: they are photographs and video
+frames owned by whoever made them, so shipping copies inside a repository that
+is served publicly would be redistributing someone else's work. Hotlinking is
+worse — it breaks the offline promise and spends someone else's bandwidth. So
+the pictures are yours, kept on your device. Some sites refuse to hand an image
+to another page; when that happens the app says so and you can save the file
+and add it that way.
 
 **Settings** — session length, hardest-words-first ordering, part hints,
 spoken words, commentary, and
@@ -125,7 +140,8 @@ network, no tracking.
    and works with no connection at all.
 
 A service worker precaches every asset on first load, so after one visit the
-app is fully offline: all 7,176 words and 667 word parts live on the device.
+app is fully offline: all 7,176 words and 667 word parts live on the device,
+along with any memes you have added.
 
 ## A splitter that learns
 
@@ -245,7 +261,7 @@ js/learn.js             perceptron: trains on corrections, on the device
 js/data/ssat.js         Upper Level SSAT words — the study list
 js/data/core.js         everyday words, dictionary backing only
 js/store.js             settings, progress, high scores, Leitner scheduling
-js/memes.js             the commentary: captions and reaction faces
+js/memes.js             the commentary: captions, faces, your meme library
 js/game.js              the three games in the Play tab
 js/app.js               views and study modes
 sw.js                   offline precache

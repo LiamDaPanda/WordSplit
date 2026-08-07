@@ -163,10 +163,29 @@
 
   function memeHTML(meme, correct) {
     if (!meme || !Memes || Store.getSettings().memes === false) return "";
+    /* A real image wins when the library has one that fits the outcome; the
+     * drawn face is the fallback, not the preference. */
+    const img = Memes.Library.pick(correct);
+    if (img) return memeCardHTML(img, meme.line, correct);
     return (
       '<div class="meme ' + (correct ? "ok" : "no") + '">' +
       icon("face-" + meme.face, "memeFace") +
       '<span class="memeLine">' + esc(meme.line) + "</span></div>"
+    );
+  }
+
+  /* The classic layout: image, heavy condensed caption in white with a black
+   * outline, laid over the bottom. The caption the meme was saved with wins;
+   * otherwise the generated line rides along. */
+  function memeCardHTML(img, fallbackLine, correct) {
+    const caption = img.caption || fallbackLine || "";
+    return (
+      '<figure class="memeCard ' + (correct ? "ok" : "no") + '">' +
+      '<img src="' + esc(img.url) + '" alt="" loading="lazy">' +
+      (caption
+        ? '<figcaption class="memeCap">' + esc(caption) + "</figcaption>"
+        : "") +
+      "</figure>"
     );
   }
 
@@ -930,7 +949,7 @@
   if (Games) {
     Games.mount({
       esc, shuffle, sample, toast, stat, splitHTML, showWordDetail, icon,
-      activeWords, ALL_WORDS, Store, Splitter, MORPHEMES
+      memeHTML, activeWords, ALL_WORDS, Store, Splitter, MORPHEMES
     });
   }
 
@@ -1219,6 +1238,8 @@
       ).join("") +
       "</select></div></div>" +
 
+      (Memes ? memeSectionHTML() : "") +
+
       (Learner ? learningSectionHTML() : "") +
 
       '<div class="sectionTitle">Progress</div><div class="card">' +
@@ -1279,6 +1300,117 @@
       renderSettings();
       toast("Progress reset");
     });
+
+    if (Memes) wireMemeSection();
+  }
+
+  /* ---------- your memes ---------- */
+
+  /* The app ships captions, not images. Well-known memes are photographs and
+   * video frames owned by whoever made them, so bundling them into a public
+   * repo would be redistributing someone else's work, and hotlinking would
+   * break the offline promise as well. The frame ships; you fill it. */
+  function memeSectionHTML() {
+    const mine = Memes.Library.list();
+    return (
+      '<div class="sectionTitle">Your memes</div><div class="card">' +
+      '<p class="small muted" style="margin-top:0">Add the memes you actually ' +
+      "find funny and they show up when you answer. They are stored on this " +
+      "device, work offline, and are never uploaded anywhere.</p>" +
+
+      '<div class="memeAdd">' +
+      '<label class="btn wide" for="memeFile">' + icon("image", "bIcon") +
+      " Choose images</label>" +
+      '<input type="file" id="memeFile" accept="image/*" multiple hidden>' +
+      '<div class="memeUrlRow">' +
+      '<input class="field" id="memeUrl" type="url" inputmode="url" ' +
+      'autocapitalize="none" autocorrect="off" spellcheck="false" ' +
+      'placeholder="…or paste an image URL">' +
+      '<button class="btn" id="memeUrlAdd">Add</button>' +
+      "</div></div>" +
+
+      (mine.length
+        ? '<div class="memeList">' + mine.map(m =>
+            '<div class="memeItem" data-id="' + m.id + '">' +
+            '<img src="' + esc(m.url) + '" alt="">' +
+            '<div class="memeItemBody">' +
+            '<input class="field memeCapInput" value="' + esc(m.caption) +
+            '" placeholder="Caption (optional)" maxlength="80">' +
+            '<div class="memeItemRow">' +
+            '<select class="field memeMood">' +
+            [["any", "Either"], ["right", "Right"], ["wrong", "Wrong"]]
+              .map(([v, label]) => '<option value="' + v + '"' +
+                (m.mood === v ? " selected" : "") + ">" + label + "</option>").join("") +
+            "</select>" +
+            '<button class="btn bad memeDel" aria-label="Remove">' +
+            icon("x", "bIcon") + "</button>" +
+            "</div></div></div>"
+          ).join("") + "</div>" +
+          '<button class="btn bad wide" id="memeClear" style="margin-top:12px">' +
+          "Remove all " + mine.length + " memes</button>"
+        : '<p class="small muted memeEmpty">No memes yet — the drawn reactions ' +
+          "are standing in until you add some.</p>") +
+      "</div>"
+    );
+  }
+
+  function wireMemeSection() {
+    const redraw = () => renderSettings();
+
+    const file = document.getElementById("memeFile");
+    if (file) {
+      file.addEventListener("change", () => {
+        const chosen = [...file.files];
+        if (!chosen.length) return;
+        Promise.all(chosen.map(f =>
+          Memes.Library.fromFile(f).then(() => null).catch(err => f.name + ": " + err.message)
+        )).then(errs => {
+          const failed = errs.filter(Boolean);
+          toast(failed.length ? failed[0] : "Added " + chosen.length +
+            (chosen.length === 1 ? " meme" : " memes"));
+          redraw();
+        });
+      });
+    }
+
+    const urlBtn = document.getElementById("memeUrlAdd");
+    if (urlBtn) {
+      urlBtn.addEventListener("click", () => {
+        const field = document.getElementById("memeUrl");
+        const url = field.value.trim();
+        if (!url) return;
+        urlBtn.disabled = true;
+        urlBtn.textContent = "…";
+        Memes.Library.fromURL(url)
+          .then(() => { toast("Added"); redraw(); })
+          .catch(err => {
+            urlBtn.disabled = false;
+            urlBtn.textContent = "Add";
+            toast(err.message);
+          });
+      });
+    }
+
+    view.querySelectorAll(".memeItem").forEach(item => {
+      const id = parseInt(item.dataset.id, 10);
+      item.querySelector(".memeMood").addEventListener("change", e => {
+        Memes.Library.update(id, { mood: e.target.value });
+      });
+      item.querySelector(".memeCapInput").addEventListener("change", e => {
+        Memes.Library.update(id, { caption: e.target.value.trim() });
+      });
+      item.querySelector(".memeDel").addEventListener("click", () => {
+        Memes.Library.remove(id).then(redraw);
+      });
+    });
+
+    const clearBtn = document.getElementById("memeClear");
+    if (clearBtn) {
+      clearBtn.addEventListener("click", () => {
+        if (!window.confirm("Remove every meme you have added?")) return;
+        Memes.Library.clear().then(() => { toast("Memes removed"); redraw(); });
+      });
+    }
   }
 
   /* What the splitter has learned, shown rather than hidden: the morphemes it
@@ -1375,6 +1507,9 @@
   applyTheme();
   updateStreakChip();
   if (Learner) Learner.setEnabled(Store.getSettings().adaptiveSplit !== false);
+  /* Loads in the background: answers given before it lands fall back to the
+   * drawn reactions rather than waiting on a database. */
+  if (Memes) Memes.Library.load();
   go("split");
 
   if ("serviceWorker" in navigator) {

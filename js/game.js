@@ -427,7 +427,13 @@
     const el = document.createElement("div");
     el.className = "flash " + (ok ? "ok" : "no");
     const meme = memeFor(ok);
-    if (meme) {
+    const img = meme && window.WordMemes ? window.WordMemes.Library.pick(ok) : null;
+    if (img) {
+      /* An image needs room, so the sticker becomes a card rather than a
+       * line of text pinned over the question. */
+      el.classList.add("withCard");
+      el.innerHTML = ctx.memeHTML(meme, ok);
+    } else if (meme) {
       el.classList.add("withFace");
       el.innerHTML = ctx.icon("face-" + meme.face, "flashFace") +
         "<span>" + ctx.esc(meme.line) + "</span>";
@@ -457,9 +463,7 @@
 
   function memeChip(meme, ok) {
     if (!meme) return "";
-    return '<div class="meme ' + (ok ? "ok" : "no") + '">' +
-      ctx.icon("face-" + meme.face, "memeFace") +
-      '<span class="memeLine">' + ctx.esc(meme.line) + "</span></div>";
+    return ctx.memeHTML(meme, ok);
   }
 
   /* ---------- Build It ---------- */
