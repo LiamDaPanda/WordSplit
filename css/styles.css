@@ -1131,9 +1131,12 @@ button, input, select { font: inherit; color: inherit; }
 .memeCard img {
   display: block;
   width: 100%;
-  max-height: 300px;
-  object-fit: contain;
-  background: #000;
+  /* Meme proportions rather than the painting's own. These are portraits, so
+   * the face sits high — the crop is biased upward to keep it in frame. */
+  aspect-ratio: 5 / 4;
+  object-fit: cover;
+  object-position: 50% 22%;
+  background: var(--surface-3);
 }
 .memeCap {
   position: absolute;
@@ -1204,3 +1207,23 @@ button, input, select { font: inherit; color: inherit; }
 .memeItemRow .btn { flex: none; padding: 0 14px; }
 .memeCapInput { font-size: 14px; }
 .memeEmpty { margin-bottom: 0; }
+
+/* Attribution for the shipped paintings: folded away, but never more than
+ * one tap from the image it credits. */
+.credits { margin-top: 14px; }
+.credits summary {
+  cursor: pointer;
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--text-2);
+  padding: 6px 0;
+}
+.credits summary::marker { color: var(--text-3); }
+.creditList {
+  margin: 6px 0 0;
+  padding-left: 18px;
+  font-size: 12.5px;
+  line-height: 1.55;
+  color: var(--text-2);
+}
+.creditList a { color: var(--accent); }

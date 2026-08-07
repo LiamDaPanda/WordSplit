@@ -16,7 +16,8 @@
     autoAdvanceMs: 0,
     hardestFirst: false,
     adaptiveSplit: true,
-    memes: true
+    memes: true,
+    builtinMemes: true
   };
 
   /* days until a word in each box comes back around */

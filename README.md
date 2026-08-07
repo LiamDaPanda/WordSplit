@@ -112,13 +112,25 @@ cards — picture with the caption laid over it in the usual heavy outlined type
 Everything you add is stored as a blob in IndexedDB **on the device**. It works
 with no connection, it is never uploaded, and *Remove all* clears it.
 
-Well-known memes are not bundled, on purpose: they are photographs and video
-frames owned by whoever made them, so shipping copies inside a repository that
-is served publicly would be redistributing someone else's work. Hotlinking is
-worse — it breaks the offline promise and spends someone else's bandwidth. So
-the pictures are yours, kept on your device. Some sites refuse to hand an image
-to another page; when that happens the app says so and you can save the file
-and add it that way.
+Ten reaction images ship with the app, so it is stocked before you add
+anything. They are paintings — Ducreux pointing and smirking (already a
+well-travelled meme in his own right), Munch's *Scream*, Courbet's *Man Made
+Mad with Fear*, Frans Hals cackling — all old enough to be out of copyright,
+each checked against its licence on Wikimedia Commons and credited under
+**Settings → Your memes → Where the shipped ones come from**. A switch there
+turns them off if you would rather only see your own.
+
+What is deliberately *not* bundled is a folder of Drake and Distracted
+Boyfriend. Those are photographs and video frames someone owns, several of
+them actively enforced, and copying them into a repository served publicly
+under your name would be redistributing someone else's work. Hotlinking is
+worse — it breaks the offline promise and spends someone else's bandwidth
+besides. Classical painters had much the same range of faces and are in the
+public domain; anything more current is a file away.
+
+Some sites refuse to hand an image to another page. That is a CORS refusal
+with no workaround from a web page, so the app says exactly that and you can
+save the file and add it that way.
 
 **Settings** — session length, hardest-words-first ordering, part hints,
 spoken words, commentary, and
@@ -261,12 +273,14 @@ js/learn.js             perceptron: trains on corrections, on the device
 js/data/ssat.js         Upper Level SSAT words — the study list
 js/data/core.js         everyday words, dictionary backing only
 js/store.js             settings, progress, high scores, Leitner scheduling
-js/memes.js             the commentary: captions, faces, your meme library
+js/memes.js             the commentary: captions, faces, meme library
+memes/                  ten public-domain reaction paintings, with credits
 js/game.js              the three games in the Play tab
 js/app.js               views and study modes
 sw.js                   offline precache
 manifest.webmanifest    PWA metadata
 icons/                  app icons, including a maskable variant
+tools/fetch-memes.py    re-fetches memes/, refusing anything not public domain
 tools/train.js          regenerates js/weights.js
 tools/evaluate.js       measures whether the model helps
 .nojekyll               serves the tree as-is on GitHub Pages

@@ -165,7 +165,7 @@
     if (!meme || !Memes || Store.getSettings().memes === false) return "";
     /* A real image wins when the library has one that fits the outcome; the
      * drawn face is the fallback, not the preference. */
-    const img = Memes.Library.pick(correct);
+    const img = Memes.Library.pick(correct, Store.getSettings().builtinMemes !== false);
     if (img) return memeCardHTML(img, meme.line, correct);
     return (
       '<div class="meme ' + (correct ? "ok" : "no") + '">' +
@@ -1261,7 +1261,7 @@
       Store.setSetting("autoAdvanceMs", parseInt(e.target.value, 10));
     });
 
-    ["hardestFirst", "showHints", "speakWords", "memes"].forEach(key => {
+    ["hardestFirst", "showHints", "speakWords", "memes", "builtinMemes"].forEach(key => {
       document.getElementById(key).addEventListener("change", e => {
         Store.setSetting(key, e.target.checked);
       });
@@ -1329,6 +1329,13 @@
       '<button class="btn" id="memeUrlAdd">Add</button>' +
       "</div></div>" +
 
+      settingSwitch(
+        "builtinMemes",
+        "Include the shipped paintings",
+        Memes.Library.builtinCount + " public-domain reaction images that came with the app",
+        Store.getSettings().builtinMemes !== false
+      ) +
+
       (mine.length
         ? '<div class="memeList">' + mine.map(m =>
             '<div class="memeItem" data-id="' + m.id + '">' +
@@ -1348,8 +1355,17 @@
           ).join("") + "</div>" +
           '<button class="btn bad wide" id="memeClear" style="margin-top:12px">' +
           "Remove all " + mine.length + " memes</button>"
-        : '<p class="small muted memeEmpty">No memes yet — the drawn reactions ' +
-          "are standing in until you add some.</p>") +
+        : '<p class="small muted memeEmpty">Nothing added yet — the shipped ' +
+          "paintings are covering it.</p>") +
+
+      '<details class="credits"><summary>Where the shipped ones come from</summary>' +
+      '<p class="small muted">Paintings old enough to be out of copyright, so they ' +
+      "can be shipped freely. Every one was checked against its licence on " +
+      "Wikimedia Commons.</p><ul class=\"creditList\">" +
+      Memes.Library.credits().map(c =>
+        '<li><a href="' + esc(c.source) + '" target="_blank" rel="noopener">' +
+        esc(c.title) + "</a> — " + esc(c.artist) + ", " + esc(c.year) + "</li>"
+      ).join("") + "</ul></details>" +
       "</div>"
     );
   }

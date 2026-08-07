@@ -144,6 +144,73 @@
    * from the camera roll or a URL; they are stored as blobs in IndexedDB on
    * this device, which means they work with no connection and never leave it.
    */
+  /* Reaction images that ship with the app.
+   *
+   * Every one is an artwork old enough that its copyright has expired, and a
+   * faithful photograph of a flat public-domain painting earns no new
+   * copyright of its own, so these can be redistributed freely. Each was
+   * checked against the Wikimedia Commons licence field before being pulled
+   * in — the sourcing script is in the commit that added them.
+   *
+   * This is deliberately not a folder of Drake and Distracted Boyfriend.
+   * Those are photographs and video frames someone owns, and several of the
+   * owners enforce; copying them into a public repository would hand this
+   * project a real problem rather than a feature. Classical painters had
+   * roughly the same range of faces and are out of copyright.
+   */
+  const BUILTIN = [
+    { file: "memes/ducreux.jpg", mood: "right",
+      caption: "and you said you didn't study",
+      title: "Portrait de l'artiste sous les traits d'un moqueur",
+      artist: "Joseph Ducreux", year: "c. 1793",
+      source: "https://commons.wikimedia.org/wiki/File:Joseph_Ducreux_-_Self-portrait_of_the_artist_as_a_mocker.jpg" },
+    { file: "memes/babbe.jpg", mood: "right",
+      caption: "the test cannot hurt you",
+      title: "Malle Babbe",
+      artist: "Frans Hals", year: "c. 1633",
+      source: "https://commons.wikimedia.org/wiki/File:Malle_Babbe_(Frans_Hals)-WUS03734.jpg" },
+    { file: "memes/cavalier.jpg", mood: "right",
+      caption: "merely correct? no. inevitable.",
+      title: "The Laughing Cavalier",
+      artist: "Frans Hals", year: "1624",
+      source: "https://commons.wikimedia.org/wiki/File:Frans_Hals_%E2%80%93_The_Laughing_Cavalier.jpg" },
+    { file: "memes/lutenist.jpg", mood: "right",
+      caption: "a toast to the prefix",
+      title: "Self-Portrait as a Lutenist",
+      artist: "Jan Steen", year: "c. 1663",
+      source: "https://commons.wikimedia.org/wiki/File:Jan_Steen_-_Self-Portrait_as_a_Lutenist_-_WGA21754.jpg" },
+    { file: "memes/leyster.jpg", mood: "right",
+      caption: "oh this? effortless",
+      title: "Self-Portrait",
+      artist: "Judith Leyster", year: "c. 1630",
+      source: "https://commons.wikimedia.org/wiki/File:Judith_Leyster_-_Self-Portrait_-_Google_Art_Project.jpg" },
+    { file: "memes/zeuxis.jpg", mood: "right",
+      caption: "i knew it the whole time",
+      title: "Self-Portrait as Zeuxis Laughing",
+      artist: "Rembrandt", year: "c. 1662",
+      source: "https://commons.wikimedia.org/wiki/File:Rembrandt_Self-portrait_as_the_Laughing_Zeuxis_while_Painting_an_Old_Woman.jpg" },
+    { file: "memes/scream.jpg", mood: "wrong",
+      caption: "the definition left my head",
+      title: "The Scream",
+      artist: "Edvard Munch", year: "1893",
+      source: "https://commons.wikimedia.org/wiki/File:Edvard_Munch_-_The_Scream_-_Google_Art_Project.jpg" },
+    { file: "memes/desespere.jpg", mood: "wrong",
+      caption: "wait, THAT was the root?",
+      title: "Le D\u00e9sesp\u00e9r\u00e9",
+      artist: "Gustave Courbet", year: "c. 1843",
+      source: "https://commons.wikimedia.org/wiki/File:Gustave_Courbet_-_Le_D%C3%A9sesp%C3%A9r%C3%A9_(1843).jpg" },
+    { file: "memes/madfear.jpg", mood: "wrong",
+      caption: "it's the vocab section",
+      title: "The Man Made Mad with Fear",
+      artist: "Gustave Courbet", year: "c. 1844",
+      source: "https://commons.wikimedia.org/wiki/File:The_Man_Made_Mad_with_Fear_by_Gustave_Courbet.jpg" },
+    { file: "memes/despair.jpg", mood: "wrong",
+      caption: "we move on",
+      title: "Despair",
+      artist: "Edvard Munch", year: "1894",
+      source: "https://commons.wikimedia.org/wiki/File:Edvard_Munch_-_Despair_(1894).jpg" },
+  ];
+
   const DB_NAME = "wordsplit-memes";
   const STORE = "memes";
   let db = null;
@@ -240,11 +307,28 @@
 
   /* A meme for this outcome, or null when the library has nothing that fits.
    * "any" images are eligible either way, so one uploaded meme still shows. */
-  function pickImage(correct) {
+  /* User images and the shipped paintings draw from one pool, so adding your
+   * own dilutes the built-ins rather than replacing them — unless you say
+   * otherwise, which is what `useBuiltins` is for. */
+  function pickImage(correct, useBuiltins) {
     const want = correct ? "right" : "wrong";
-    const fits = loaded.filter(m => m.mood === want || m.mood === "any");
+    const pool = useBuiltins === false ? [] : BUILTIN.map(b => ({
+      id: "builtin:" + b.file,
+      mood: b.mood,
+      caption: b.caption,
+      url: b.file,
+      builtin: true
+    }));
+    const fits = pool.concat(loaded)
+      .filter(m => m.mood === want || m.mood === "any");
     if (!fits.length) return null;
     return fits[Math.floor(Math.random() * fits.length)];
+  }
+
+  function credits() {
+    return BUILTIN.map(b => ({
+      title: b.title, artist: b.artist, year: b.year, source: b.source
+    }));
   }
 
   /* Images are capped so one enormous screenshot cannot eat the device
@@ -285,8 +369,9 @@
   }
 
   const Library = {
-    load, list, add, update, remove, clear,
+    load, list, add, update, remove, clear, credits,
     fromFile, fromURL, pick: pickImage,
+    builtinCount: BUILTIN.length,
     get count() { return loaded.length; },
     set onChange(fn) { onChange = fn; }
   };

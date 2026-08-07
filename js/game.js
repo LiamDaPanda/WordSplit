@@ -427,7 +427,9 @@
     const el = document.createElement("div");
     el.className = "flash " + (ok ? "ok" : "no");
     const meme = memeFor(ok);
-    const img = meme && window.WordMemes ? window.WordMemes.Library.pick(ok) : null;
+    const img = meme && window.WordMemes
+      ? window.WordMemes.Library.pick(ok, ctx.Store.getSettings().builtinMemes !== false)
+      : null;
     if (img) {
       /* An image needs room, so the sticker becomes a card rather than a
        * line of text pinned over the question. */
