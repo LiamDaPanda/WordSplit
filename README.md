@@ -93,8 +93,20 @@ one (new / shaky / learning / mastered), with a detail page per word.
 **Roots** — browse the whole morpheme database on its own, searchable by
 spelling or meaning.
 
+**Commentary** — every answer gets a reaction face and a caption. Get it right
+and you're told you're built different; miss one and you get *"Bold guess.
+Wrong, but bold."* Streaks are noticed, broken streaks are mourned, and the
+first right answer after a miss is a redemption arc. It reads the score at the
+end of a session or a game too.
+
+The captions are text and the faces are the same inline SVGs as everything
+else, so nothing is downloaded and the app stays fully offline. A miss is never
+an insult — the lines tease the moment, not the person — and the caption always
+sits *above* the real feedback, never instead of it. **Settings → Commentary**
+turns the whole thing off.
+
 **Settings** — session length, hardest-words-first ordering, part hints,
-spoken words, and
+spoken words, commentary, and
 light/dark/system theme. Auto-advance is **off** by default so an answer and its
 breakdown stay on screen until you tap Next; it can be set to 3, 5, or 8
 seconds. Adaptive splitting can be turned off, and both progress and learned
@@ -233,6 +245,7 @@ js/learn.js             perceptron: trains on corrections, on the device
 js/data/ssat.js         Upper Level SSAT words — the study list
 js/data/core.js         everyday words, dictionary backing only
 js/store.js             settings, progress, high scores, Leitner scheduling
+js/memes.js             the commentary: captions and reaction faces
 js/game.js              the three games in the Play tab
 js/app.js               views and study modes
 sw.js                   offline precache

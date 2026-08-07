@@ -873,6 +873,36 @@ button, input, select { font: inherit; color: inherit; }
 }
 .flash.ok { color: var(--good); }
 .flash.no { color: var(--bad); }
+/* With a caption the flash stops being one big word and becomes a sticker:
+ * face on top, line under it, width capped so a long quip still fits a phone. */
+.flash.withFace {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  width: min(80vw, 320px);
+  padding: 18px 20px;
+  text-align: center;
+  font-size: 20px;
+  font-weight: 800;
+  line-height: 1.25;
+  /* it lands on top of a question, so it needs its own ground to read against */
+  border-radius: var(--r-lg);
+  background: color-mix(in srgb, var(--surface) 94%, transparent);
+  border: 1px solid currentColor;
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
+  box-shadow: var(--shadow-lg);
+  text-shadow: none;
+}
+.flashFace {
+  width: 54px; height: 54px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.5;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
 @keyframes flashPop {
   0% { opacity: 0; transform: translate(-50%,-34%) scale(.82); }
   22% { opacity: 1; transform: translate(-50%,-50%) scale(1.05); }
@@ -1027,3 +1057,56 @@ button, input, select { font: inherit; color: inherit; }
 .scoreMark.good, .trophy.best { color: var(--warn); }
 .scoreMark.ok, .trophy.good { color: var(--good); }
 .scoreMark.low, .trophy.low { color: var(--accent); }
+
+/* ---------- commentary ---------- */
+
+/* A caption above the real feedback. It is allowed to be loud, but it sits
+ * in its own tinted row so it never competes with the answer underneath. */
+.meme {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 10px;
+  padding: 9px 13px;
+  /* hugs its caption rather than stretching the card's full width */
+  width: fit-content;
+  max-width: 100%;
+  border-radius: 999px;
+  font-size: 14px;
+  font-weight: 750;
+  letter-spacing: -0.012em;
+  line-height: 1.35;
+  animation: memeIn 0.34s var(--ease) backwards;
+}
+.meme.ok {
+  color: var(--good);
+  background: var(--good-bg);
+  border: 1px solid color-mix(in srgb, var(--good) 32%, transparent);
+}
+.meme.no {
+  color: var(--bad);
+  background: var(--bad-bg);
+  border: 1px solid color-mix(in srgb, var(--bad) 32%, transparent);
+}
+.memeFace {
+  flex: none;
+  width: 26px; height: 26px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.5;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+.memeLine { min-width: 0; }
+
+/* The results screens centre their card, so the chip centres with it. */
+.card.center .meme {
+  margin: 14px auto 0;
+  width: fit-content;
+  max-width: 100%;
+}
+
+@keyframes memeIn {
+  from { opacity: 0; transform: translateY(-5px) scale(0.96); }
+  to { opacity: 1; transform: none; }
+}

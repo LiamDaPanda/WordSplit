@@ -15,7 +15,8 @@
     speakWords: false,
     autoAdvanceMs: 0,
     hardestFirst: false,
-    adaptiveSplit: true
+    adaptiveSplit: true,
+    memes: true
   };
 
   /* days until a word in each box comes back around */

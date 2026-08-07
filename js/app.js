@@ -3,6 +3,7 @@
   const Store = window.WordStore;
   const Splitter = window.WordSplitter;
   const Learner = window.WordLearner || null;
+  const Memes = window.WordMemes || null;
   const MORPHEMES = window.WS_MORPHEMES;
   const ORIGIN_NAMES = window.WS_ORIGIN_NAMES;
 
@@ -140,6 +141,43 @@
     } catch (err) {
       /* speech is a nicety; never let it break a session */
     }
+  }
+
+  /* ---------- the peanut gallery ---------- */
+
+  /* The run has to be counted here rather than in advance(), which does not
+   * run until the reader taps Next — by then the caption is already on screen. */
+  function noteAnswer(correct) {
+    const s = state.session;
+    if (!s) return { run: correct ? 1 : 0, hadMissed: false };
+    const hadMissed = !!s.everMissed;
+    if (correct) {
+      s.run = (s.run || 0) + 1;
+      return { run: s.run, hadMissed };
+    }
+    const ended = s.run || 0;
+    s.everMissed = true;
+    s.run = 0;
+    return { run: ended, hadMissed };
+  }
+
+  function memeHTML(meme, correct) {
+    if (!meme || !Memes || Store.getSettings().memes === false) return "";
+    return (
+      '<div class="meme ' + (correct ? "ok" : "no") + '">' +
+      icon("face-" + meme.face, "memeFace") +
+      '<span class="memeLine">' + esc(meme.line) + "</span></div>"
+    );
+  }
+
+  /* A caption above the real feedback, never instead of it. */
+  function feedbackHTML(correct, text) {
+    const st = noteAnswer(correct);
+    const meme = Memes ? Memes.answer(correct, st.run, st.hadMissed) : null;
+    return (
+      memeHTML(meme, correct) +
+      '<div class="feedback ' + (correct ? "ok" : "no") + '">' + esc(text) + "</div>"
+    );
   }
 
   /* ---------- split rendering ---------- */
@@ -611,7 +649,8 @@
       (pct >= 80 ? "good" : pct >= 50 ? "ok" : "low") + '">' +
       icon(pct >= 80 ? "trophy" : pct >= 50 ? "check" : "repeat", "hugeIcon") + "</div>" +
       "<h2 style=\"margin:6px 0\">" + pct + "% correct</h2>" +
-      '<p class="muted">' + s.right + " right · " + s.wrong + " to review</p></div>" +
+      '<p class="muted">' + s.right + " right · " + s.wrong + " to review</p>" +
+      memeHTML(Memes ? Memes.summary(pct) : null, pct >= 50) + "</div>" +
       '<button class="btn primary wide" id="againBtn">Study again</button>' +
       '<button class="btn wide" id="doneBtn" style="margin-top:10px">Back to modes</button>';
     document.getElementById("againBtn").addEventListener("click", () => startSession(s.mode));
@@ -734,8 +773,7 @@
     panel.className = "card";
     panel.style.marginTop = "14px";
     panel.innerHTML =
-      '<div class="feedback ' + (correct ? "ok" : "no") + '">' +
-      (correct ? "Correct" : "Not quite") + "</div>" +
+      feedbackHTML(correct, correct ? "Correct" : "Not quite") +
       splitHTML(word, { showExamples: false });
     view.insertBefore(panel, document.getElementById("quitBtn"));
 
@@ -814,8 +852,7 @@
         panel.style.marginTop = "14px";
         const entry = target.entry;
         panel.innerHTML =
-          '<div class="feedback ' + (correct ? "ok" : "no") + '">' +
-          (correct ? "Correct" : "Not quite") + "</div>" +
+          feedbackHTML(correct, correct ? "Correct" : "Not quite") +
           "<p><b>" + esc(entry.key) + "-</b> (" +
           esc(ORIGIN_NAMES[entry.origin] || entry.origin) + ") means <b>" +
           esc(entry.meaning) + "</b>.</p>" +
@@ -868,8 +905,7 @@
       panel.className = "card";
       panel.style.marginTop = "14px";
       panel.innerHTML =
-        '<div class="feedback ' + (correct ? "ok" : "no") + '">' +
-        (correct ? "Correct" : "The word was " + esc(word)) + "</div>" +
+        feedbackHTML(correct, correct ? "Correct" : "The word was " + word) +
         splitHTML(word, { showExamples: false });
       view.insertBefore(panel, document.getElementById("quitBtn"));
 
@@ -1171,6 +1207,7 @@
       ).join("") +
       "</select></div>" +
       settingSwitch("speakWords", "Speak words aloud", "Read each word using the device voice", s.speakWords) +
+      settingSwitch("memes", "Commentary", "A caption reacts to every answer. Turn it off for quiet study.", s.memes !== false) +
       "</div>" +
 
       '<div class="sectionTitle">Appearance</div><div class="card">' +
@@ -1203,7 +1240,7 @@
       Store.setSetting("autoAdvanceMs", parseInt(e.target.value, 10));
     });
 
-    ["hardestFirst", "showHints", "speakWords"].forEach(key => {
+    ["hardestFirst", "showHints", "speakWords", "memes"].forEach(key => {
       document.getElementById(key).addEventListener("change", e => {
         Store.setSetting(key, e.target.checked);
       });

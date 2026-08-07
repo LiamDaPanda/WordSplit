@@ -228,6 +228,7 @@
 
   function scoreCorrect() {
     state.right += 1;
+    state.run = (state.run || 0) + 1;
     state.combo += 1;
     state.bestCombo = Math.max(state.bestCombo, state.combo);
     const mult = Math.min(state.combo, COMBO_CAP);
@@ -237,6 +238,10 @@
 
   function scoreWrong(word) {
     state.wrong += 1;
+    /* kept so the commentary can mourn the run this answer just ended */
+    state.lastRun = state.run || 0;
+    state.run = 0;
+    state.everMissed = true;
     state.combo = 0;
     if (word && state.missed.indexOf(word) === -1) state.missed.push(word);
     if (state.id === "rush") state.endsAt -= WRONG_PENALTY_MS;
@@ -314,6 +319,17 @@
     );
   }
 
+  /* Redraws the header in place, without disturbing the answered question
+   * underneath it. */
+  function refreshStatus(view) {
+    const head = view.querySelector(".gameHead");
+    if (!head) return;
+    const wrap = document.createElement("div");
+    wrap.innerHTML = statusBar();
+    const fresh = wrap.firstChild;
+    if (fresh) head.replaceWith(fresh);
+  }
+
   function tickColor(pct) {
     if (pct <= 17) return "var(--bad)";
     if (pct <= 45) return "var(--warn)";
@@ -379,6 +395,9 @@
         else dead = scoreWrong(state.q.word);
 
         flash(correct);
+        /* The header carries lives and score, and the pause below is long
+         * enough that leaving a spent heart lit would read as a bug. */
+        refreshStatus(view);
         /* Rush stays quick — a short beat, then on. Survival pauses so the
          * word that cost a life can actually be read. */
         const pause = correct ? 420 : state.id === "rush" ? 900 : 1500;
@@ -407,12 +426,40 @@
   function flash(ok) {
     const el = document.createElement("div");
     el.className = "flash " + (ok ? "ok" : "no");
-    el.textContent = ok
-      ? ["Nice", "Yes", "Got it", "Sharp"][Math.floor(Math.random() * 4)] +
-        (state.combo > 2 ? " ×" + Math.min(state.combo, COMBO_CAP) : "")
-      : "Missed";
+    const meme = memeFor(ok);
+    if (meme) {
+      el.classList.add("withFace");
+      el.innerHTML = ctx.icon("face-" + meme.face, "flashFace") +
+        "<span>" + ctx.esc(meme.line) + "</span>";
+    } else {
+      el.textContent = ok
+        ? ["Nice", "Yes", "Got it", "Sharp"][Math.floor(Math.random() * 4)] +
+          (state.combo > 2 ? " ×" + Math.min(state.combo, COMBO_CAP) : "")
+        : "Missed";
+    }
     document.body.appendChild(el);
-    setTimeout(() => el.remove(), 700);
+    setTimeout(() => el.remove(), 900);
+  }
+
+  /* null when the commentary is switched off, so every caller falls back to
+   * the plain wording rather than rendering an empty sticker. */
+  function memeFor(ok) {
+    const Memes = window.WordMemes;
+    if (!Memes || ctx.Store.getSettings().memes === false) return null;
+    return Memes.answer(ok, ok ? state.run || 0 : state.lastRun || 0, !!state.everMissed);
+  }
+
+  function gameOverMeme(pct, isBest) {
+    const Memes = window.WordMemes;
+    if (!Memes || ctx.Store.getSettings().memes === false) return null;
+    return Memes.gameOver(pct, !!isBest);
+  }
+
+  function memeChip(meme, ok) {
+    if (!meme) return "";
+    return '<div class="meme ' + (ok ? "ok" : "no") + '">' +
+      ctx.icon("face-" + meme.face, "memeFace") +
+      '<span class="memeLine">' + ctx.esc(meme.line) + "</span></div>";
   }
 
   /* ---------- Build It ---------- */
@@ -485,11 +532,14 @@
         ctx.Store.record(state.q.word, correct);
         if (correct) scoreCorrect();
         else scoreWrong(state.q.word);
+        const meme = memeFor(correct);
         flash(correct);
+        refreshStatus(view);
 
         const panel = document.createElement("div");
         panel.className = "card";
         panel.innerHTML =
+          memeChip(meme, correct) +
           '<div class="feedback ' + (correct ? "ok" : "no") + '">' +
           (correct ? "Correct" : "It was " + ctx.esc(state.q.word)) + "</div>" +
           ctx.splitHTML(state.q.word, { showExamples: false, allowTeach: false });
@@ -527,6 +577,7 @@
       (rec.isBest
         ? '<p class="bestTag">New best</p>'
         : '<p class="muted">Best: ' + (rec.best || 0) + "</p>") +
+      memeChip(gameOverMeme(pct, rec.isBest), rec.isBest || pct >= 50) +
       "</div>" +
       '<div class="statGrid">' +
       ctx.stat(state.right, "correct") +
