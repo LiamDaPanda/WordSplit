@@ -150,9 +150,9 @@ with the override table bypassed so the splitter has to derive each reading:
 
 | | exact-match accuracy |
 |---|---|
-| Hand-written rules alone | 68.4% |
-| With the shipped model | **75.5%** |
-| Held out: train on half, test on the half it never saw | 69.3% → **73.3%** |
+| Hand-written rules alone | 67.9% |
+| With the shipped model | **74.8%** |
+| Held out: train on half, test on the half it never saw | 66.9% → **72.1%** |
 
 The held-out row is the honest one — it shows corrections carrying to unseen
 words rather than the model memorizing its training set. Split coverage is
@@ -207,6 +207,13 @@ the word, so a reading may never quietly add or drop a letter — *possess* is n
 allowed to become *possese* on the way to an analysis. And a regular ending is
 only peeled off when doing so buys something: *species* keeps its own spelling
 rather than being read as a plural of *speci*.
+
+Pieces are shown with the letters the word actually has. Overrides are written
+with a morpheme's canonical form, but words carry whichever variant assimilated
+to its neighbours, so *accommodate* opens with `ac-`, not the `ad-` it is filed
+under. And a leftover middle is only called a **base** when it is a word in its
+own right (`be` + `moan`); otherwise it is labelled a **stem**, because
+*abhorrence* leaves `abhorr`, which is not a word and should not be called one.
 
 An override table handles words whose real history disagrees with a greedy
 match (`reticent` is `re` + `tac` + `ent`, not `retic` + `ent`) and blocks

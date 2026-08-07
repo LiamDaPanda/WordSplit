@@ -90,6 +90,12 @@
     annex: "ad|nex|",
     apotheosis: "apo|the|osis",
     reticent: "re|tac|ent",
+    /* neg- "not" fused onto leg/lig "to choose": what is not picked out */
+    neglect: "neg|lect|",
+    negligent: "neg|lig|ent",
+    negligence: "neg|lig|ence",
+    negligible: "neg|lig|ible",
+    ability: "|abil|ity",
     taciturn: "|tac|",
     laconic: "|lac|ic",
     ephemeral: "epi|hemer|al",
@@ -912,6 +918,30 @@
     add("prefix", preSpec);
     add("root", rootSpec);
     add("suffix", sufSpec);
+
+    /* Overrides are written with a morpheme's canonical form, but the word
+     * carries whichever variant assimilated to its neighbours — "accommodate"
+     * is ad- spelled ac-. Walking the word and preferring the variant that is
+     * actually there means a piece never shows letters the word does not have. */
+    let at = 0;
+    parts.forEach(part => {
+      /* Same length only: assimilation swaps letters (ad->ac, sub->sur), it
+       * never lengthens a piece. Allowing a longer variant would let a root
+       * eat the suffix behind it — "lac" + "ic" becoming "laconic" + "ic". */
+      const forms = part.entry ? part.entry.variants : [part.text];
+      let pick = null;
+      forms.forEach(v => {
+        if (v.length === part.text.length && word.startsWith(v, at)) pick = v;
+      });
+      if (pick) {
+        part.text = pick;
+        at += pick.length;
+      } else {
+        const found = word.indexOf(part.text, at);
+        at = found === -1 ? at + part.text.length : found + part.text.length;
+      }
+    });
+
     return { word, parts, confidence: "high", overridden: true };
   }
 
@@ -1071,7 +1101,9 @@
         alternates: lookupAll("prefix", bestPre)
       });
     }
-    parts.push({ kind: "base", text: base, entry: null, meaning: "the base word" });
+    /* No meaning: whether this leftover is a real word or just a stem is a
+     * question about the word list, which lives above the engine. */
+    parts.push({ kind: "base", text: base, entry: null, meaning: "" });
     if (bestSuf) {
       const entry = lookup("suffix", bestSuf);
       parts.push({

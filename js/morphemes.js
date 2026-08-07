@@ -49,7 +49,7 @@ const PREFIXES = [
   "il,im,in,ir|not, without|L|illegal,immature,inept,irregular",
   "im,in|in, into, onto|L|immerse,influx,incision",
   "infra|below, beneath|L|infrastructure,infrared",
-  "inter|between, among|L|intervene,interrupt,intersperse",
+  "inter,intel|between, among|L|intervene,interrupt,intelligent",
   "intra,intro|within, inside|L|intramural,introspect,introvert",
   "iso|equal|G|isolate,isosceles,isotope",
   "juxta|next to|L|juxtapose",
@@ -250,7 +250,7 @@ const ROOTS = [
   "pon,pos,post|to place, to put|L|component,deposit,posture,juxtapose",
   "port|to carry|L|transport,portable,deport,comport",
   "pot|power|L|potent,potential,despot,impotent",
-  "prehend,pris|to seize, to grasp|L|comprehend,apprehend,reprisal,comprise",
+  "prehend,prehens,pris|to seize, to grasp|L|comprehend,apprehend,reprisal,comprise",
   "prim,prin|first|L|primary,primitive,principal,primeval",
   "priv|separate, individual|L|private,deprive,privation",
   "prob,prov|to test, to prove, good|L|probe,approve,reprobate,probity",
@@ -545,7 +545,7 @@ const ROOTS = [
 ];
 
 const SUFFIXES = [
-  "able,ible|able to be, capable of|L|readable,edible,tenable",
+  "able,ible,abil,ibil|able to be, capable of|L|readable,edible,capability",
   "acious,cious,ious|full of, having|L|voracious,gracious,ambitious",
   "acity,icity|quality of|L|tenacity,veracity,simplicity",
   "acy,cy|state or quality of|L|privacy,accuracy,fallacy",

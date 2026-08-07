@@ -145,8 +145,16 @@
   /* ---------- split rendering ---------- */
 
   function pieceHTML(part) {
-    const kindLabel = part.kind === "link" ? "joins" : part.kind;
-    const meaning = part.kind === "base" && !part.meaning ? "base word" : part.meaning;
+    let kindLabel = part.kind === "link" ? "joins" : part.kind;
+    let meaning = part.meaning;
+    if (part.kind === "base" && !meaning) {
+      /* A leftover middle is only "the base word" when it really is one.
+       * "abhorrence" leaves "abhorr", which is not a word and should not be
+       * called one — it is a bound stem, so say that instead of overclaiming. */
+      const isWord = ALL_WORDS.has(part.text);
+      kindLabel = isWord ? "base" : "stem";
+      meaning = isWord ? "a word on its own" : "what the affixes attach to";
+    }
     return (
       '<button class="piece ' + part.kind + '" data-morpheme="' +
       esc(part.entry ? part.entry.kind + ":" + part.text : "") + '">' +
@@ -203,9 +211,13 @@
 
     if (result.parts.length > 1) {
       html += '<div class="pieces">';
+      /* The joiner travels with the piece that follows it, so a row that
+       * wraps never leaves a dangling "+" at the end of a line. */
       result.parts.forEach((part, i) => {
-        if (i) html += '<span class="joiner">+</span>';
-        html += pieceHTML(part);
+        html += i
+          ? '<span class="pieceGroup"><span class="joiner">+</span>' +
+            pieceHTML(part) + "</span>"
+          : pieceHTML(part);
       });
       html += "</div>";
 
@@ -269,7 +281,7 @@
         '" data-pick-word="' + esc(word) + '"><span>' +
         '<span class="lw">' + c.parts.map(p => esc(p.text)).join(" + ") + "</span>" +
         '<span class="ld">' +
-        c.parts.map(p => esc(p.entry ? p.meaning : "base word")).join(" · ") +
+        c.parts.map(p => esc(p.entry ? p.meaning : "stem")).join(" · ") +
         "</span></span>" +
         (i === 0 ? '<span class="small muted">current</span>' : "") +
         "</button>"
@@ -334,7 +346,8 @@
       '<div id="splitResult"></div>' +
       '<div class="sectionTitle">Word of the day</div>' +
       '<div class="card" id="dailyCard">' + splitHTML(daily, { allowTeach: true }) + "</div>" +
-      '<button class="btn wide" id="randomBtn">🎲 Split a random word</button>';
+      '<button class="btn wide" id="randomBtn">' + icon("shuffle", "bIcon") +
+        " Split a random word</button>";
 
     const input = document.getElementById("splitInput");
     const result = document.getElementById("splitResult");
@@ -406,13 +419,19 @@
   /* ---------- view: study ---------- */
 
   const MODES = [
-    { id: "flashcards", icon: "🃏", name: "Flashcards", desc: "See the word, recall the meaning, grade yourself." },
-    { id: "meaning", icon: "🎯", name: "Pick the meaning", desc: "Multiple choice from the word to its definition." },
-    { id: "word", icon: "🔤", name: "Pick the word", desc: "Multiple choice from the definition back to the word." },
-    { id: "parts", icon: "🧩", name: "Parts quiz", desc: "Identify what a prefix, root, or suffix means." },
-    { id: "spell", icon: "⌨️", name: "Spell it", desc: "Read the definition and type the word." },
-    { id: "review", icon: "🔁", name: "Due review", desc: "Only the words your schedule says are due." }
+    { id: "flashcards", icon: "cards", name: "Flashcards", desc: "See the word, recall the meaning, grade yourself." },
+    { id: "meaning", icon: "study", name: "Pick the meaning", desc: "Multiple choice from the word to its definition." },
+    { id: "word", icon: "letters", name: "Pick the word", desc: "Multiple choice from the definition back to the word." },
+    { id: "parts", icon: "puzzle", name: "Parts quiz", desc: "Identify what a prefix, root, or suffix means." },
+    { id: "spell", icon: "keyboard", name: "Spell it", desc: "Read the definition and type the word." },
+    { id: "review", icon: "repeat", name: "Due review", desc: "Only the words your schedule says are due." }
   ];
+
+  /* One <use> of the sprite in index.html; colour comes from the theme. */
+  function icon(id, cls) {
+    return '<svg class="' + (cls || "gIcon") + '" aria-hidden="true"><use href="#i-' +
+      id + '"/></svg>';
+  }
 
   function renderStudy() {
     viewTitle.textContent = "Study";
@@ -424,16 +443,15 @@
     const settings = Store.getSettings();
 
     view.innerHTML =
+      masteryCard(words, sum) +
       '<div class="statGrid">' +
       stat(sum.due, "due now") +
-      stat(sum.mastered, "mastered") +
-      stat(words.length, "words in rotation") +
       stat(stats.streak || 0, "day streak") +
       "</div>" +
       '<div class="sectionTitle">Study modes</div>' +
       MODES.map(m =>
         '<button class="modeCard" data-mode="' + m.id + '">' +
-        '<span class="mIcon">' + m.icon + "</span><span><span class=\"mName\">" +
+        '<span class="mIcon">' + icon(m.icon) + "</span><span><span class=\"mName\">" +
         esc(m.name) + '</span><span class="mDesc">' + esc(m.desc) + "</span></span></button>"
       ).join("") +
       '<p class="small muted center">Sessions are ' + settings.sessionLength +
@@ -442,6 +460,36 @@
     view.querySelectorAll(".modeCard").forEach(btn => {
       btn.addEventListener("click", () => startSession(btn.dataset.mode));
     });
+  }
+
+  /* A donut of how the list breaks down by mastery, with the counts beside
+   * it. The ring is a conic gradient driven by three custom properties, so
+   * there is no chart library and nothing to load. */
+  function masteryCard(words, sum) {
+    const total = words.length || 1;
+    const pctOf = n => (100 * n) / total;
+    const known = Math.round(pctOf(sum.mastered));
+    const rows = [
+      ["mastered", sum.mastered, "var(--good)"],
+      ["learning", sum.learning, "var(--warn)"],
+      ["shaky", sum.shaky, "var(--bad)"],
+      ["not seen", sum.new, "var(--surface-3)"]
+    ];
+
+    return (
+      '<div class="card"><div class="ringRow">' +
+      '<div class="ring" style="--mastered:' + pctOf(sum.mastered) +
+      ";--learning:" + pctOf(sum.learning) +
+      ";--shaky:" + pctOf(sum.shaky) + '">' +
+      '<span class="ringLabel"><b>' + known + "%</b><span>mastered</span></span></div>" +
+      '<div class="legend">' +
+      rows.map(([name, n, color]) =>
+        '<div><span class="dot" style="background:' + color + '"></span>' +
+        "<b>" + n.toLocaleString() + "</b> " +
+        '<span class="muted">' + esc(name) + "</span></div>"
+      ).join("") +
+      "</div></div></div>"
+    );
   }
 
   function stat(value, label) {
@@ -518,7 +566,9 @@
       '<div class="progressbar"><i style="width:' + pct + '%"></i></div>' +
       '<div class="spread small muted" style="margin-bottom:10px">' +
       "<span>" + (s.index + 1) + " of " + s.queue.length + "</span>" +
-      "<span>✅ " + s.right + " &nbsp; ❌ " + s.wrong + "</span></div>";
+      '<span class="tally"><span class="ok">' + icon("check", "tIcon") + s.right +
+      '</span><span class="bad">' + icon("x", "tIcon") + s.wrong +
+      "</span></span></div>";
 
     let body = "";
     if (s.mode === "flashcards" || s.mode === "review") body = flashcardHTML(word);
@@ -557,8 +607,9 @@
     const total = s.right + s.wrong;
     const pct = total ? Math.round((s.right / total) * 100) : 0;
     view.innerHTML =
-      '<div class="card center"><div style="font-size:44px">' +
-      (pct >= 80 ? "🎉" : pct >= 50 ? "👍" : "💪") + "</div>" +
+      '<div class="card center"><div class="scoreMark ' +
+      (pct >= 80 ? "good" : pct >= 50 ? "ok" : "low") + '">' +
+      icon(pct >= 80 ? "trophy" : pct >= 50 ? "check" : "repeat", "hugeIcon") + "</div>" +
       "<h2 style=\"margin:6px 0\">" + pct + "% correct</h2>" +
       '<p class="muted">' + s.right + " right · " + s.wrong + " to review</p></div>" +
       '<button class="btn primary wide" id="againBtn">Study again</button>' +
@@ -842,7 +893,7 @@
   const Games = window.WordGames || null;
   if (Games) {
     Games.mount({
-      esc, shuffle, sample, toast, stat, splitHTML, showWordDetail,
+      esc, shuffle, sample, toast, stat, splitHTML, showWordDetail, icon,
       activeWords, ALL_WORDS, Store, Splitter, MORPHEMES
     });
   }
@@ -850,7 +901,7 @@
   function renderPlay() {
     viewTitle.textContent = "Play";
     if (!Games) {
-      view.innerHTML = '<div class="empty"><span class="bigEmoji">🎮</span>' +
+      view.innerHTML = '<div class="empty">' + icon("play", "bigIcon") +
         "Games are unavailable.</div>";
       return;
     }
@@ -889,7 +940,7 @@
       });
       const shown = items.slice(0, 120);
       if (!shown.length) {
-        list.innerHTML = '<div class="empty"><span class="bigEmoji">🔍</span>No words match.</div>';
+        list.innerHTML = '<div class="empty">' + icon("search", "bigIcon") + "No words match.</div>";
         return;
       }
       list.innerHTML =
@@ -933,7 +984,8 @@
         ? Math.ceil((e.due - Date.now()) / 86400000) + "d"
         : "now", "next review") +
       "</div>" +
-      '<button class="btn wide" id="speakBtn" style="margin-top:12px">🔊 Say it</button>';
+      '<button class="btn wide" id="speakBtn" style="margin-top:12px">' +
+      icon("speaker", "bIcon") + " Say it</button>";
 
     document.getElementById("backBtn").addEventListener("click", renderBrowse);
     document.getElementById("speakBtn").addEventListener("click", () => {
@@ -1012,7 +1064,7 @@
         !q || e.variants.some(v => v.indexOf(q) === 0) || e.meaning.toLowerCase().indexOf(q) !== -1
       );
       if (!items.length) {
-        list.innerHTML = '<div class="empty"><span class="bigEmoji">🌱</span>Nothing matches.</div>';
+        list.innerHTML = '<div class="empty">' + icon("roots", "bigIcon") + "Nothing matches.</div>";
         return;
       }
       list.innerHTML = items.map(e =>
@@ -1250,7 +1302,8 @@
     const stats = Store.getStats();
     if (stats.streak > 0) {
       streakChip.hidden = false;
-      streakChip.textContent = "🔥 " + stats.streak + " day" + (stats.streak === 1 ? "" : "s");
+      streakChip.innerHTML = icon("flame", "sIcon") + "<span>" + stats.streak +
+        " day" + (stats.streak === 1 ? "" : "s") + "</span>";
     } else {
       streakChip.hidden = true;
     }

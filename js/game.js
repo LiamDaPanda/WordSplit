@@ -16,21 +16,21 @@
   const GAMES = [
     {
       id: "rush",
-      icon: "⚡",
+      icon: "bolt",
       name: "Word Rush",
       desc: "60 seconds. Answer fast, keep the combo alive.",
       best: "Best score"
     },
     {
       id: "build",
-      icon: "🧱",
+      icon: "blocks",
       name: "Build It",
       desc: "Assemble the word from its prefix, root, and suffix.",
       best: "Best build"
     },
     {
       id: "survival",
-      icon: "❤️",
+      icon: "heart",
       name: "Survival",
       desc: "Three lives. It gets harder the longer you last.",
       best: "Best streak"
@@ -79,7 +79,7 @@
         const s = scores[g.id] || { best: 0, played: 0 };
         return (
           '<button class="modeCard" data-game="' + g.id + '">' +
-          '<span class="mIcon">' + g.icon + "</span>" +
+          '<span class="mIcon">' + ctx.icon(g.icon) + "</span>" +
           '<span><span class="mName">' + esc(g.name) + "</span>" +
           '<span class="mDesc">' + esc(g.desc) + "</span>" +
           '<span class="mBest">' + esc(g.best) + ": <b>" + (s.best || 0) + "</b>" +
@@ -196,11 +196,16 @@
       ticker = setInterval(() => {
         if (!state || state.over) return;
         if (Date.now() >= state.endsAt) return finish();
-        const bar = document.getElementById("timeBar");
+        const ring = document.getElementById("timeRing");
         const label = document.getElementById("timeLeft");
         const left = Math.max(0, state.endsAt - Date.now());
-        if (bar) bar.style.width = (100 * left) / (ROUND_SECONDS * 1000) + "%";
-        if (label) label.textContent = Math.ceil(left / 1000) + "s";
+        const pct = (100 * left) / (ROUND_SECONDS * 1000);
+        if (ring) {
+          ring.style.setProperty("--left", pct);
+          ring.style.setProperty("--tick", tickColor(pct));
+          ring.classList.toggle("low", left <= 10000);
+        }
+        if (label) label.textContent = Math.ceil(left / 1000);
       }, 100);
     }
     render(view);
@@ -258,34 +263,61 @@
 
   /* ---------- round rendering ---------- */
 
+  /* Score on the left, and whatever measures this game's runway on the right:
+   * a countdown ring, remaining lives, or the round counter. */
   function statusBar() {
-    const esc = ctx.esc;
-    let left = "";
+    const pctLeft = state.id === "rush"
+      ? (100 * Math.max(0, state.endsAt - Date.now())) / (ROUND_SECONDS * 1000)
+      : 0;
+    const secs = Math.ceil(Math.max(0, state.endsAt - Date.now()) / 1000);
+
+    /* Every game gets the same ring, filled by whatever is running out:
+     * seconds in Rush, lives in Survival, rounds in Build It. Keeping the
+     * shape constant means the header reads the same way in all three. */
+    let gauge;
     if (state.id === "rush") {
-      left =
-        '<span id="timeLeft">' + Math.ceil(Math.max(0, state.endsAt - Date.now()) / 1000) +
-        "s</span>";
+      gauge = '<div class="timeRing' + (secs <= 10 ? " low" : "") + '" id="timeRing" ' +
+        'style="--left:' + pctLeft + ";--tick:" + tickColor(pctLeft) + '">' +
+        '<span id="timeLeft">' + secs + "</span></div>";
     } else if (state.id === "survival") {
-      left = '<span class="lives">' + "❤️".repeat(Math.max(0, state.lives)) + "</span>";
+      gauge = '<div class="timeRing" style="--left:' + (state.lives / 3) * 100 +
+        ";--tick:" + (state.lives > 1 ? "var(--accent)" : "var(--bad)") + '">' +
+        "<span>" + state.right + "</span></div>";
     } else {
-      left = "<span>" + Math.min(state.round, BUILD_ROUNDS) + " / " + BUILD_ROUNDS + "</span>";
+      const done = Math.min(state.round - 1, BUILD_ROUNDS);
+      gauge = '<div class="timeRing" style="--left:' + (done / BUILD_ROUNDS) * 100 +
+        ';--tick:var(--accent)"><span>' +
+        Math.min(state.round, BUILD_ROUNDS) + "</span></div>";
     }
 
-    const combo =
-      state.combo > 1
-        ? '<span class="combo">×' + Math.min(state.combo, COMBO_CAP) + " combo</span>"
-        : "";
+    let sub;
+    if (state.id === "survival") {
+      /* Always draw three hearts and dim the spent ones, so the row keeps
+       * its width and a lost life reads as a change rather than a reflow. */
+      sub = '<span class="lives">' + [0, 1, 2].map(i =>
+        '<span class="life' + (i < state.lives ? "" : " spent") + '">' +
+        ctx.icon("heart", "lIcon") + "</span>").join("") + "</span>";
+    } else if (state.id === "build") {
+      sub = '<span class="sub">of ' + BUILD_ROUNDS + " rounds</span>";
+    } else {
+      sub = '<span class="sub">' + state.right + " right · " + state.wrong + " missed</span>";
+    }
+
+    const combo = state.combo > 1
+      ? '<span class="combo">' + Math.min(state.combo, COMBO_CAP) + "× combo</span>"
+      : "";
 
     return (
-      (state.id === "rush"
-        ? '<div class="timeTrack"><i id="timeBar" style="width:' +
-          (100 * Math.max(0, state.endsAt - Date.now())) / (ROUND_SECONDS * 1000) +
-          '%"></i></div>'
-        : "") +
-      '<div class="gameBar">' + left +
-      '<span class="score">' + state.score + "</span>" +
-      combo + "</div>"
+      '<div class="gameHead">' + gauge +
+      '<div class="gameMeta"><span class="score">' + state.score + "</span>" +
+      sub + combo + "</div></div>"
     );
+  }
+
+  function tickColor(pct) {
+    if (pct <= 17) return "var(--bad)";
+    if (pct <= 45) return "var(--warn)";
+    return "var(--accent)";
   }
 
   function renderRound(view) {
@@ -486,7 +518,9 @@
 
     view.innerHTML =
       '<div class="card center">' +
-      '<div style="font-size:46px">' + (rec.isBest ? "🏆" : pct >= 70 ? "🎉" : "💪") + "</div>" +
+      '<div class="trophy ' + (rec.isBest ? "best" : pct >= 70 ? "good" : "low") +
+      '">' + ctx.icon(rec.isBest ? "trophy" : pct >= 70 ? "check" : "repeat",
+      "hugeIcon") + "</div>" +
       '<h2 style="margin:6px 0 2px">' +
       (state.id === "survival" ? state.right + " in a row" : state.score + " points") +
       "</h2>" +
