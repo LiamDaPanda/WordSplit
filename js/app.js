@@ -4,6 +4,7 @@
   const Splitter = window.WordSplitter;
   const Learner = window.WordLearner || null;
   const Memes = window.WordMemes || null;
+  const Analogy = window.WordAnalogy || null;
   const MORPHEMES = window.WS_MORPHEMES;
   const ORIGIN_NAMES = window.WS_ORIGIN_NAMES;
 
@@ -386,6 +387,230 @@
     return out;
   }
 
+  /* ---------- study mode: analogies ---------- */
+
+  let questions = null;
+
+  /* Distractors that are not obviously wrong: same ending where possible, so
+   * the question turns on the relation rather than on the shape of the word. */
+  function analogyDistractors(answer, n) {
+    const pool = activeWords();
+    const tail = answer.slice(-3);
+    const alike = pool.filter(w => w !== answer && w.endsWith(tail));
+    const out = sample(alike, n);
+    if (out.length < n) {
+      sample(pool, n * 3).forEach(w => {
+        if (out.length < n && w !== answer && out.indexOf(w) === -1) out.push(w);
+      });
+    }
+    return out.slice(0, n);
+  }
+
+  function analogyQuestionHTML(q) {
+    if (!q) return '<div class="card"><p class="muted">No question.</p></div>';
+    return (
+      '<div class="card"><div class="prompt">Complete the analogy</div>' +
+      '<div class="analogyLine">' +
+      "<b>" + esc(q.a) + '</b> <span class="relIs">is to</span> <b>' + esc(q.b) + "</b>" +
+      '<span class="relAs">as</span>' +
+      "<b>" + esc(q.c) + '</b> <span class="relIs">is to</span> <b class="blank">?</b>' +
+      "</div></div>" +
+      '<div class="choices">' +
+      q.options.map(w =>
+        '<button class="choice" data-word="' + esc(w) + '">' + esc(w) + "</button>"
+      ).join("") +
+      "</div>"
+    );
+  }
+
+  function bindAnalogyQuestion(q) {
+    view.querySelectorAll(".choice").forEach(btn => {
+      btn.addEventListener("click", () => {
+        const s = state.session;
+        if (s.answered) return;
+        s.answered = true;
+        const correct = btn.dataset.word === q.answer;
+
+        view.querySelectorAll(".choice").forEach(b => {
+          b.disabled = true;
+          if (b.dataset.word === q.answer) b.classList.add("correct");
+          else if (b === btn) b.classList.add("wrong");
+        });
+
+        const panel = document.createElement("div");
+        panel.className = "card";
+        panel.style.marginTop = "14px";
+        panel.innerHTML =
+          feedbackHTML(correct, correct ? "Correct" : "It was " + q.answer) +
+          '<p class="defRow"><span class="defLabel">Relation:</span>' +
+          '<span class="defText">' + esc(q.relation ? q.relation.label : "") +
+          "</span></p>" +
+          '<p class="defRow"><span class="defLabel">Both pairs:</span>' +
+          '<span class="defText"><b>' + esc(q.a) + "</b> → <b>" + esc(q.b) +
+          "</b> and <b>" + esc(q.c) + "</b> → <b>" + esc(q.answer) + "</b></span></p>" +
+          splitHTML(q.answer, { showExamples: false, allowTeach: false });
+        view.insertBefore(panel, document.getElementById("quitBtn"));
+
+        const next = document.createElement("button");
+        next.className = "btn primary wide";
+        next.style.marginTop = "12px";
+        next.textContent = "Next";
+        view.insertBefore(next, document.getElementById("quitBtn"));
+        next.addEventListener("click", () => advance(correct, q.answer));
+        next.focus();
+      });
+    });
+  }
+
+  /* ---------- view: analogies ---------- */
+
+  /* The SSAT asks "A is to B as C is to what?". Put two words in and the app
+   * names the relation between them, then finds other pairs that stand in the
+   * same relation — which is the point, because the relation is nearly always
+   * structural, and once you see it once you have it for every word built the
+   * same way. */
+  function renderAnalogy(preload) {
+    viewTitle.textContent = "Analogies";
+    const a = (preload && preload[0]) || "";
+    const b = (preload && preload[1]) || "";
+
+    view.innerHTML =
+      '<form class="pairRow" id="pairForm">' +
+      '<input class="field" id="pairA" type="search" autocapitalize="none" ' +
+      'autocorrect="off" spellcheck="false" placeholder="first word" value="' +
+      esc(a) + '">' +
+      '<span class="pairIs">is to</span>' +
+      '<input class="field" id="pairB" type="search" autocapitalize="none" ' +
+      'autocorrect="off" spellcheck="false" placeholder="second word" value="' +
+      esc(b) + '">' +
+      '<button class="btn primary" id="pairGo" type="submit">Find</button>' +
+      "</form>" +
+      '<div id="pairResult"></div>';
+
+    document.getElementById("pairForm").addEventListener("submit", e => {
+      e.preventDefault();
+      showAnalogy(
+        document.getElementById("pairA").value,
+        document.getElementById("pairB").value
+      );
+    });
+
+    if (a && b) showAnalogy(a, b);
+    else {
+      document.getElementById("pairResult").innerHTML =
+        '<div class="card"><p class="small muted" style="margin-top:0">Put in two ' +
+        "words that feel related and the app works out how, then finds other " +
+        "pairs that relate the same way.</p>" +
+        '<div class="sectionTitle" style="margin-top:14px">Try one</div>' +
+        '<div class="chips">' +
+        [["benevolent", "malevolent"], ["audible", "inaudible"],
+         ["import", "export"], ["negligent", "diligent"]].map(([x, y]) =>
+          '<button class="chip" data-pair="' + esc(x) + "|" + esc(y) + '">' +
+          esc(x) + " : " + esc(y) + "</button>").join("") +
+        "</div></div>";
+      view.querySelectorAll("[data-pair]").forEach(chip => {
+        chip.addEventListener("click", () => {
+          const [x, y] = chip.dataset.pair.split("|");
+          document.getElementById("pairA").value = x;
+          document.getElementById("pairB").value = y;
+          showAnalogy(x, y);
+        });
+      });
+    }
+  }
+
+  function showAnalogy(rawA, rawB) {
+    const box = document.getElementById("pairResult");
+    if (!box) return;
+    const a = String(rawA || "").toLowerCase().trim();
+    const b = String(rawB || "").toLowerCase().trim();
+    if (!a || !b) return;
+
+    const missing = [a, b].filter(w => !Analogy || !Splitter.split(w).parts.some(p => p.entry));
+    if (!Analogy) {
+      box.innerHTML = '<div class="card"><p class="muted">Analogies are unavailable.</p></div>';
+      return;
+    }
+
+    const rel = Analogy.relate(a, b);
+    if (!rel) {
+      box.innerHTML =
+        '<div class="card"><div class="feedback no">No shared structure</div>' +
+        "<p><b>" + esc(a) + "</b> and <b>" + esc(b) + "</b> do not share a root " +
+        "or an affix frame, so there is no breakdown-level relation to show." +
+        (missing.length
+          ? " " + esc(missing.join(" and ")) + " may also be outside the dictionary."
+          : "") +
+        "</p><p class=\"small muted\" style=\"margin-bottom:0\">This app only " +
+        "claims relations it can point at in the spelling. Two words can still " +
+        "be related in meaning without being related in build.</p></div>" +
+        pairSplitHTML(a, b);
+      return;
+    }
+
+    const pairs = Analogy.analogues(a, b, 12);
+    box.innerHTML =
+      '<div class="card">' +
+      '<div class="relHead">' + esc(a) + ' <span class="relIs">is to</span> ' + esc(b) + "</div>" +
+      '<div class="relTag' + (rel.opposite ? " opposed" : "") + '">' + esc(rel.label) + "</div>" +
+      relDetailHTML(rel) +
+      "</div>" +
+      (pairs.length
+        ? '<div class="sectionTitle">Pairs that relate the same way</div>' +
+          '<div class="list">' + pairs.map(p =>
+            '<button class="listItem" data-word="' + esc(p.a) + '"' +
+            (p.b ? ' data-pair-b="' + esc(p.b) + '"' : "") + '>' +
+            '<span class="liText"><span class="lw">' + esc(p.a) +
+            (p.b ? ' <span class="relIs">is to</span> ' + esc(p.b) : "") + "</span>" +
+            '<span class="ld">' + esc(pairGloss(p)) + "</span></span>" +
+            (Analogy.isStudy(p.a) ? '<span class="dot ' + Store.level(p.a) + '"></span>' : "") +
+            "</button>").join("") + "</div>"
+        : '<p class="small muted center">No other pair in the dictionary relates ' +
+          "this way — the relation is real, but this one is on its own.</p>") +
+      pairSplitHTML(a, b);
+
+    box.querySelectorAll(".listItem").forEach(btn => {
+      btn.addEventListener("click", () => {
+        const other = btn.dataset.pairB;
+        if (other) renderAnalogy([btn.dataset.word, other]);
+        else showWordDetail(btn.dataset.word);
+      });
+    });
+  }
+
+  function relDetailHTML(rel) {
+    if (rel.type === "shared-root") {
+      return '<p class="defRow"><span class="defLabel">Shared root:</span>' +
+        '<span class="defText"><b>' + esc(rel.fromText) + "</b> — " +
+        esc(rel.fromMeaning) + "</span></p>";
+    }
+    const arrow = '<span class="relArrow">→</span>';
+    return (
+      '<p class="defRow"><span class="defLabel">Changes:</span><span class="defText">' +
+      "<b>" + esc(rel.fromText || "nothing") + "</b> " + arrow + " <b>" +
+      esc(rel.toText || "nothing") + "</b></span></p>" +
+      (rel.fromMeaning || rel.toMeaning
+        ? '<p class="defRow"><span class="defLabel">Meaning:</span>' +
+          '<span class="defText">' + esc(rel.fromMeaning || "—") + " " + arrow +
+          " " + esc(rel.toMeaning || "—") + "</span></p>"
+        : "")
+    );
+  }
+
+  function pairGloss(p) {
+    const rec = ALL_WORDS.get(p.b || p.a);
+    return rec ? rec.def : "";
+  }
+
+  function pairSplitHTML(a, b) {
+    return (
+      '<div class="sectionTitle">Both, broken apart</div>' +
+      '<div class="card">' + splitHTML(a, { showExamples: false, allowTeach: false }) + "</div>" +
+      '<div class="card" style="margin-top:10px">' +
+      splitHTML(b, { showExamples: false, allowTeach: false }) + "</div>"
+    );
+  }
+
   /* ---------- view: split ---------- */
 
   function renderSplit(preload) {
@@ -481,6 +706,7 @@
     { id: "word", icon: "letters", name: "Pick the word", desc: "Multiple choice from the definition back to the word." },
     { id: "parts", icon: "puzzle", name: "Parts quiz", desc: "Identify what a prefix, root, or suffix means." },
     { id: "spell", icon: "keyboard", name: "Spell it", desc: "Read the definition and type the word." },
+    { id: "analogies", icon: "pairs", name: "Analogies", desc: "A is to B as C is to what — the SSAT's own format." },
     { id: "review", icon: "repeat", name: "Due review", desc: "Only the words your schedule says are due." }
   ];
 
@@ -573,6 +799,25 @@
     } else if (mode === "parts") {
       /* only words the splitter can actually break apart */
       pool = words.filter(w => Splitter.split(w).parts.some(p => p.entry));
+    } else if (mode === "analogies") {
+      /* Questions are generated, not drawn from the list, so the queue holds
+       * the answer word of each — which keeps scoring, the Leitner schedule
+       * and the progress dots working exactly as they do everywhere else. */
+      questions = [];
+      const seen = new Set();
+      for (let i = 0; i < settings.sessionLength * 4 && questions.length < settings.sessionLength; i++) {
+        const q = Analogy && Analogy.question(analogyDistractors);
+        if (!q) continue;
+        const sig = q.a + ">" + q.b + ">" + q.c;
+        if (seen.has(sig)) continue;
+        seen.add(sig);
+        questions.push(q);
+      }
+      if (!questions.length) {
+        toast("Not enough related pairs to build a round");
+        return;
+      }
+      pool = questions.map(q => q.answer);
     } else {
       pool = words.slice();
     }
@@ -603,7 +848,8 @@
       right: 0,
       wrong: 0,
       answered: false,
-      flipped: false
+      flipped: false,
+      questions: mode === "analogies" ? questions : null
     };
     renderSession();
   }
@@ -632,6 +878,7 @@
     else if (s.mode === "meaning") body = choiceHTML(word, "meaning");
     else if (s.mode === "word") body = choiceHTML(word, "word");
     else if (s.mode === "parts") body = partsHTML(word);
+    else if (s.mode === "analogies") body = analogyQuestionHTML(s.questions[s.index]);
     else if (s.mode === "spell") body = spellHTML(word);
 
     view.innerHTML =
@@ -643,6 +890,7 @@
     if (s.mode === "flashcards" || s.mode === "review") bindFlashcard(word);
     else if (s.mode === "meaning" || s.mode === "word") bindChoice(word);
     else if (s.mode === "parts") bindParts(word);
+    else if (s.mode === "analogies") bindAnalogyQuestion(s.questions[s.index]);
     else if (s.mode === "spell") bindSpell(word);
 
     speak(word);
@@ -1496,6 +1744,7 @@
 
   const VIEWS = {
     split: renderSplit,
+    analogy: renderAnalogy,
     study: renderStudy,
     play: renderPlay,
     browse: renderBrowse,
@@ -1526,6 +1775,9 @@
   /* Loads in the background: answers given before it lands fall back to the
    * drawn reactions rather than waiting on a database. */
   if (Memes) Memes.Library.load();
+  /* One pass to build the analogy indexes, over everything the app can
+   * recognise, with the study list marked as the preferred vocabulary. */
+  if (Analogy) Analogy.index([...ALL_WORDS.keys()], w => Splitter.split(w), STUDY_LIST.words);
   go("split");
 
   if ("serviceWorker" in navigator) {
