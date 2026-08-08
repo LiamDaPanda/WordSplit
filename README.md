@@ -37,17 +37,19 @@ Once you know that `cred` means "believe", you get *credible*, *credence*,
 
 | | |
 |---|---|
-| **Upper Level SSAT list** | 4,822 words — the one study list |
+| **Upper Level SSAT list** | 4,884 words — the one study list |
 | **Dictionary backing** | 2,442 further everyday and academic words |
-| **Words the app knows** | 7,176 |
+| **Words the app knows** | 7,238 |
 | **Word parts** | 93 prefixes, 439 roots, 135 suffixes |
 
 Every word carries a part of speech and a plain-language definition. The word
 parts each carry a meaning, a language of origin, and classic example words.
 
-There is one study list. The everyday words are loaded but never drilled — they
-exist so that looking a word up returns a definition instead of a blank, and so
-the splitter has a vocabulary wide enough to tell a real word from a typo.
+There is one study list, and only one — the SSAT. The everyday words are not a
+second list you can switch to; they are a recognition dictionary. They exist so
+that looking a word up returns a definition instead of a blank, and so the
+splitter has a vocabulary wide enough to tell a real word from a typo. They are
+never drilled, scored, or counted.
 
 ## Features
 
@@ -76,7 +78,7 @@ Answers still count toward your progress, so playing is real study.
 Each keeps a high score on the device, and the results screen lists the words
 you missed so you can tap straight through to them.
 
-**Six study modes**
+**Seven study modes**
 
 - **Flashcards** — see the word, recall the meaning, grade yourself. Optional
   part hints show the morpheme breakdown before you flip.
@@ -85,7 +87,18 @@ you missed so you can tap straight through to them.
 - **Parts quiz** — a word is split on screen and one piece is highlighted; say
   what that piece means. This is the mode that builds transferable knowledge.
 - **Spell it** — read the definition, type the word.
+- **Analogies** — A is to B as C is to what, in the test's own format.
 - **Due review** — only the words the spaced-repetition schedule says are due.
+
+**Pairs** — put in two words and the app works out how they relate, then lists
+other pairs that relate the same way. *benevolent* is to *malevolent* as
+*benediction* is to *malediction*: both swap the same prefix over the same
+root. Tapping a pair pivots the view onto it. There is an **Analogies** study
+mode too, asking it in the SSAT's own A : B :: C : ? format.
+
+Everything it reports is derived from the breakdown, so it is a relation the
+app can point at in the spelling rather than one it asserts. Where two words
+share no structure it says so instead of inventing something.
 
 **Words** — browse or search the full list, filtered by how well you know each
 one (new / shaky / learning / mastered), with a detail page per word.
@@ -93,8 +106,47 @@ one (new / shaky / learning / mastered), with a detail page per word.
 **Roots** — browse the whole morpheme database on its own, searchable by
 spelling or meaning.
 
+**Commentary** — every answer gets a reaction face and a caption. Get it right
+and you're told you're built different; miss one and you get *"Bold guess.
+Wrong, but bold."* Streaks are noticed, broken streaks are mourned, and the
+first right answer after a miss is a redemption arc. It reads the score at the
+end of a session or a game too.
+
+A miss is never an insult — the lines tease the moment, not the person — and
+the caption always sits *above* the real feedback, never instead of it.
+**Settings → Commentary** turns the whole thing off.
+
+**Your memes** — the app ships the frame; you fill it. Add images from the
+camera roll or paste an image URL, tag each one to show on a right answer, a
+wrong one, or either, and give it a caption. They then appear as proper meme
+cards — picture with the caption laid over it in the usual heavy outlined type
+— in study, in the games, and on the results screens.
+
+Everything you add is stored as a blob in IndexedDB **on the device**. It works
+with no connection, it is never uploaded, and *Remove all* clears it.
+
+Ten reaction images ship with the app, so it is stocked before you add
+anything. They are paintings — Ducreux pointing and smirking (already a
+well-travelled meme in his own right), Munch's *Scream*, Courbet's *Man Made
+Mad with Fear*, Frans Hals cackling — all old enough to be out of copyright,
+each checked against its licence on Wikimedia Commons and credited under
+**Settings → Your memes → Where the shipped ones come from**. A switch there
+turns them off if you would rather only see your own.
+
+What is deliberately *not* bundled is a folder of Drake and Distracted
+Boyfriend. Those are photographs and video frames someone owns, several of
+them actively enforced, and copying them into a repository served publicly
+under your name would be redistributing someone else's work. Hotlinking is
+worse — it breaks the offline promise and spends someone else's bandwidth
+besides. Classical painters had much the same range of faces and are in the
+public domain; anything more current is a file away.
+
+Some sites refuse to hand an image to another page. That is a CORS refusal
+with no workaround from a web page, so the app says exactly that and you can
+save the file and add it that way.
+
 **Settings** — session length, hardest-words-first ordering, part hints,
-spoken words, and
+spoken words, commentary, and
 light/dark/system theme. Auto-advance is **off** by default so an answer and its
 breakdown stay on screen until you tap Next; it can be set to 3, 5, or 8
 seconds. Adaptive splitting can be turned off, and both progress and learned
@@ -113,7 +165,8 @@ network, no tracking.
    and works with no connection at all.
 
 A service worker precaches every asset on first load, so after one visit the
-app is fully offline: all 7,176 words and 667 word parts live on the device.
+app is fully offline: all 7,238 words and 667 word parts live on the device,
+along with any memes you have added.
 
 ## A splitter that learns
 
@@ -150,9 +203,9 @@ with the override table bypassed so the splitter has to derive each reading:
 
 | | exact-match accuracy |
 |---|---|
-| Hand-written rules alone | 68.4% |
-| With the shipped model | **75.5%** |
-| Held out: train on half, test on the half it never saw | 69.3% → **73.3%** |
+| Hand-written rules alone | 67.9% |
+| With the shipped model | **76.1%** |
+| Held out: train on half, test on the half it never saw | 66.9% → **72.1%** |
 
 The held-out row is the honest one — it shows corrections carrying to unseen
 words rather than the model memorizing its training set. Split coverage is
@@ -208,6 +261,13 @@ allowed to become *possese* on the way to an analysis. And a regular ending is
 only peeled off when doing so buys something: *species* keeps its own spelling
 rather than being read as a plural of *speci*.
 
+Pieces are shown with the letters the word actually has. Overrides are written
+with a morpheme's canonical form, but words carry whichever variant assimilated
+to its neighbours, so *accommodate* opens with `ac-`, not the `ad-` it is filed
+under. And a leftover middle is only called a **base** when it is a word in its
+own right (`be` + `moan`); otherwise it is labelled a **stem**, because
+*abhorrence* leaves `abhorr`, which is not a word and should not be called one.
+
 An override table handles words whose real history disagrees with a greedy
 match (`reticent` is `re` + `tac` + `ent`, not `retic` + `ent`) and blocks
 over-splitting of ordinary words (`summer` is not `sum` + `mer`). Every override
@@ -225,12 +285,16 @@ js/weights.js           the learned model the app ships with (generated)
 js/learn.js             perceptron: trains on corrections, on the device
 js/data/ssat.js         Upper Level SSAT words — the study list
 js/data/core.js         everyday words, dictionary backing only
+js/analogy.js           relations between word pairs, and the pairs that match
 js/store.js             settings, progress, high scores, Leitner scheduling
+js/memes.js             the commentary: captions, faces, meme library
+memes/                  ten public-domain reaction paintings, with credits
 js/game.js              the three games in the Play tab
 js/app.js               views and study modes
 sw.js                   offline precache
 manifest.webmanifest    PWA metadata
 icons/                  app icons, including a maskable variant
+tools/fetch-memes.py    re-fetches memes/, refusing anything not public domain
 tools/train.js          regenerates js/weights.js
 tools/evaluate.js       measures whether the model helps
 .nojekyll               serves the tree as-is on GitHub Pages

@@ -3,30 +3,32 @@
   const Store = window.WordStore;
   const Splitter = window.WordSplitter;
   const Learner = window.WordLearner || null;
+  const Memes = window.WordMemes || null;
+  const Analogy = window.WordAnalogy || null;
   const MORPHEMES = window.WS_MORPHEMES;
   const ORIGIN_NAMES = window.WS_ORIGIN_NAMES;
 
-  /* One study list. The everyday words are still loaded, but only as
-   * dictionary backing: they give definitions for words people look up and
-   * give the splitter a wide enough vocabulary to tell a real word from a
-   * typo. They are never drilled. */
+  /* There is one list: the Upper Level SSAT. Nothing else is studied, offered,
+   * or switchable.
+   *
+   * The everyday words loaded alongside it are not a second list — they are a
+   * recognition dictionary. They exist so that looking a word up returns a
+   * definition instead of a blank, and so the splitter has a vocabulary wide
+   * enough to tell a real word from a typo. They are never drilled, never
+   * counted, and never named as a choice. */
   const STUDY_LIST = {
     key: "ssat",
     name: "Upper Level SSAT",
     raw: window.WS_LIST_SSAT || []
   };
-  const DICTIONARY_LIST = {
-    key: "core",
-    name: "Everyday & Academic",
-    raw: window.WS_LIST_CORE || []
-  };
-  const LISTS = { ssat: STUDY_LIST, core: DICTIONARY_LIST };
+  const RECOGNITION = { key: "core", raw: window.WS_LIST_CORE || [] };
+  const LISTS = { ssat: STUDY_LIST, core: RECOGNITION };
 
   const POS_NAMES = { n: "noun", v: "verb", adj: "adjective", adv: "adverb" };
 
   /* word -> {word, pos, def, lists[]} across every list, built once */
   const ALL_WORDS = new Map();
-  [STUDY_LIST, DICTIONARY_LIST].forEach(list => {
+  [STUDY_LIST, RECOGNITION].forEach(list => {
     const key = list.key;
     LISTS[key].words = [];
     LISTS[key].raw.forEach(line => {
@@ -64,9 +66,34 @@
     return STUDY_LIST.words.length ? STUDY_LIST.words : [...ALL_WORDS.keys()];
   }
 
-  /* Regular endings, so a definition can be found for a form the dictionary
-   * does not list directly ("abating" -> "abate", "duties" -> "duty"). */
+  /* Endings that let a definition be found for a form the dictionary does not
+   * list directly. Two kinds:
+   *
+   *  - inflection, where the word is the same word ("abating" -> "abate")
+   *  - derivation, where it is a word built from another ("audibility" ->
+   *    "audible"), which is where most real lookups were failing: nobody
+   *    types the dictionary headword, they type the form they just read.
+   *
+   * Sorted longest-ending-first at load, so "ibility" is tried before "ity"
+   * and the table can be written in whatever order reads best. */
   const ENDINGS = [
+    { end: "ibility", add: ["ible"], note: "the quality of being" },
+    { end: "ability", add: ["able"], note: "the quality of being" },
+    { end: "ically", add: ["ic", "ical"], note: "the adverb from" },
+    { end: "ously", add: ["ous"], note: "the adverb from" },
+    { end: "ently", add: ["ent"], note: "the adverb from" },
+    { end: "antly", add: ["ant"], note: "the adverb from" },
+    { end: "fully", add: ["ful", ""], note: "the adverb from" },
+    { end: "ily", add: ["y"], note: "the adverb from" },
+    { end: "ness", add: ["", "e"], note: "the quality of being" },
+    { end: "ancy", add: ["ant", "ance"], note: "the state of being" },
+    { end: "ency", add: ["ent", "ence"], note: "the state of being" },
+    { end: "acy", add: ["ate", "ant"], note: "the state of being" },
+    { end: "atory", add: ["ate"], note: "relating to" },
+    { end: "ized", add: ["ize"], note: "past tense of" },
+    { end: "ised", add: ["ise", "ize"], note: "past tense of" },
+    { end: "izing", add: ["ize"], note: "the -ing form of" },
+    { end: "ments", add: ["ment"], note: "plural of" },
     { end: "ies", add: ["y"], note: "plural of" },
     { end: "ied", add: ["y"], note: "past tense of" },
     { end: "ing", add: ["", "e"], note: "the -ing form of" },
@@ -76,7 +103,7 @@
     { end: "er", add: ["", "e"], note: "the comparative of" },
     { end: "ly", add: ["", "e"], note: "the adverb from" },
     { end: "s", add: [""], note: "plural of" }
-  ];
+  ].sort((x, y) => y.end.length - x.end.length);
 
   /* Find a definition for any word: the entry itself, or the entry for the
    * form it is built from. Returns null only when the word is unknown. */
@@ -142,11 +169,75 @@
     }
   }
 
+  /* ---------- the peanut gallery ---------- */
+
+  /* The run has to be counted here rather than in advance(), which does not
+   * run until the reader taps Next — by then the caption is already on screen. */
+  function noteAnswer(correct) {
+    const s = state.session;
+    if (!s) return { run: correct ? 1 : 0, hadMissed: false };
+    const hadMissed = !!s.everMissed;
+    if (correct) {
+      s.run = (s.run || 0) + 1;
+      return { run: s.run, hadMissed };
+    }
+    const ended = s.run || 0;
+    s.everMissed = true;
+    s.run = 0;
+    return { run: ended, hadMissed };
+  }
+
+  function memeHTML(meme, correct) {
+    if (!meme || !Memes || Store.getSettings().memes === false) return "";
+    /* A real image wins when the library has one that fits the outcome; the
+     * drawn face is the fallback, not the preference. */
+    const img = Memes.Library.pick(correct, Store.getSettings().builtinMemes !== false);
+    if (img) return memeCardHTML(img, meme.line, correct);
+    return (
+      '<div class="meme ' + (correct ? "ok" : "no") + '">' +
+      icon("face-" + meme.face, "memeFace") +
+      '<span class="memeLine">' + esc(meme.line) + "</span></div>"
+    );
+  }
+
+  /* The classic layout: image, heavy condensed caption in white with a black
+   * outline, laid over the bottom. The caption the meme was saved with wins;
+   * otherwise the generated line rides along. */
+  function memeCardHTML(img, fallbackLine, correct) {
+    const caption = img.caption || fallbackLine || "";
+    return (
+      '<figure class="memeCard ' + (correct ? "ok" : "no") + '">' +
+      '<img src="' + esc(img.url) + '" alt="" loading="lazy">' +
+      (caption
+        ? '<figcaption class="memeCap">' + esc(caption) + "</figcaption>"
+        : "") +
+      "</figure>"
+    );
+  }
+
+  /* A caption above the real feedback, never instead of it. */
+  function feedbackHTML(correct, text) {
+    const st = noteAnswer(correct);
+    const meme = Memes ? Memes.answer(correct, st.run, st.hadMissed) : null;
+    return (
+      memeHTML(meme, correct) +
+      '<div class="feedback ' + (correct ? "ok" : "no") + '">' + esc(text) + "</div>"
+    );
+  }
+
   /* ---------- split rendering ---------- */
 
   function pieceHTML(part) {
-    const kindLabel = part.kind === "link" ? "joins" : part.kind;
-    const meaning = part.kind === "base" && !part.meaning ? "base word" : part.meaning;
+    let kindLabel = part.kind === "link" ? "joins" : part.kind;
+    let meaning = part.meaning;
+    if (part.kind === "base" && !meaning) {
+      /* A leftover middle is only "the base word" when it really is one.
+       * "abhorrence" leaves "abhorr", which is not a word and should not be
+       * called one — it is a bound stem, so say that instead of overclaiming. */
+      const isWord = ALL_WORDS.has(part.text);
+      kindLabel = isWord ? "base" : "stem";
+      meaning = isWord ? "a word on its own" : "what the affixes attach to";
+    }
     return (
       '<button class="piece ' + part.kind + '" data-morpheme="' +
       esc(part.entry ? part.entry.kind + ":" + part.text : "") + '">' +
@@ -203,9 +294,13 @@
 
     if (result.parts.length > 1) {
       html += '<div class="pieces">';
+      /* The joiner travels with the piece that follows it, so a row that
+       * wraps never leaves a dangling "+" at the end of a line. */
       result.parts.forEach((part, i) => {
-        if (i) html += '<span class="joiner">+</span>';
-        html += pieceHTML(part);
+        html += i
+          ? '<span class="pieceGroup"><span class="joiner">+</span>' +
+            pieceHTML(part) + "</span>"
+          : pieceHTML(part);
       });
       html += "</div>";
 
@@ -269,7 +364,7 @@
         '" data-pick-word="' + esc(word) + '"><span>' +
         '<span class="lw">' + c.parts.map(p => esc(p.text)).join(" + ") + "</span>" +
         '<span class="ld">' +
-        c.parts.map(p => esc(p.entry ? p.meaning : "base word")).join(" · ") +
+        c.parts.map(p => esc(p.entry ? p.meaning : "stem")).join(" · ") +
         "</span></span>" +
         (i === 0 ? '<span class="small muted">current</span>' : "") +
         "</button>"
@@ -317,6 +412,230 @@
     return out;
   }
 
+  /* ---------- study mode: analogies ---------- */
+
+  let questions = null;
+
+  /* Distractors that are not obviously wrong: same ending where possible, so
+   * the question turns on the relation rather than on the shape of the word. */
+  function analogyDistractors(answer, n) {
+    const pool = activeWords();
+    const tail = answer.slice(-3);
+    const alike = pool.filter(w => w !== answer && w.endsWith(tail));
+    const out = sample(alike, n);
+    if (out.length < n) {
+      sample(pool, n * 3).forEach(w => {
+        if (out.length < n && w !== answer && out.indexOf(w) === -1) out.push(w);
+      });
+    }
+    return out.slice(0, n);
+  }
+
+  function analogyQuestionHTML(q) {
+    if (!q) return '<div class="card"><p class="muted">No question.</p></div>';
+    return (
+      '<div class="card"><div class="prompt">Complete the analogy</div>' +
+      '<div class="analogyLine">' +
+      "<b>" + esc(q.a) + '</b> <span class="relIs">is to</span> <b>' + esc(q.b) + "</b>" +
+      '<span class="relAs">as</span>' +
+      "<b>" + esc(q.c) + '</b> <span class="relIs">is to</span> <b class="blank">?</b>' +
+      "</div></div>" +
+      '<div class="choices">' +
+      q.options.map(w =>
+        '<button class="choice" data-word="' + esc(w) + '">' + esc(w) + "</button>"
+      ).join("") +
+      "</div>"
+    );
+  }
+
+  function bindAnalogyQuestion(q) {
+    view.querySelectorAll(".choice").forEach(btn => {
+      btn.addEventListener("click", () => {
+        const s = state.session;
+        if (s.answered) return;
+        s.answered = true;
+        const correct = btn.dataset.word === q.answer;
+
+        view.querySelectorAll(".choice").forEach(b => {
+          b.disabled = true;
+          if (b.dataset.word === q.answer) b.classList.add("correct");
+          else if (b === btn) b.classList.add("wrong");
+        });
+
+        const panel = document.createElement("div");
+        panel.className = "card";
+        panel.style.marginTop = "14px";
+        panel.innerHTML =
+          feedbackHTML(correct, correct ? "Correct" : "It was " + q.answer) +
+          '<p class="defRow"><span class="defLabel">Relation:</span>' +
+          '<span class="defText">' + esc(q.relation ? q.relation.label : "") +
+          "</span></p>" +
+          '<p class="defRow"><span class="defLabel">Both pairs:</span>' +
+          '<span class="defText"><b>' + esc(q.a) + "</b> → <b>" + esc(q.b) +
+          "</b> and <b>" + esc(q.c) + "</b> → <b>" + esc(q.answer) + "</b></span></p>" +
+          splitHTML(q.answer, { showExamples: false, allowTeach: false });
+        view.insertBefore(panel, document.getElementById("quitBtn"));
+
+        const next = document.createElement("button");
+        next.className = "btn primary wide";
+        next.style.marginTop = "12px";
+        next.textContent = "Next";
+        view.insertBefore(next, document.getElementById("quitBtn"));
+        next.addEventListener("click", () => advance(correct, q.answer));
+        next.focus();
+      });
+    });
+  }
+
+  /* ---------- view: analogies ---------- */
+
+  /* The SSAT asks "A is to B as C is to what?". Put two words in and the app
+   * names the relation between them, then finds other pairs that stand in the
+   * same relation — which is the point, because the relation is nearly always
+   * structural, and once you see it once you have it for every word built the
+   * same way. */
+  function renderAnalogy(preload) {
+    viewTitle.textContent = "Analogies";
+    const a = (preload && preload[0]) || "";
+    const b = (preload && preload[1]) || "";
+
+    view.innerHTML =
+      '<form class="pairRow" id="pairForm">' +
+      '<input class="field" id="pairA" type="search" autocapitalize="none" ' +
+      'autocorrect="off" spellcheck="false" placeholder="first word" value="' +
+      esc(a) + '">' +
+      '<span class="pairIs">is to</span>' +
+      '<input class="field" id="pairB" type="search" autocapitalize="none" ' +
+      'autocorrect="off" spellcheck="false" placeholder="second word" value="' +
+      esc(b) + '">' +
+      '<button class="btn primary" id="pairGo" type="submit">Find</button>' +
+      "</form>" +
+      '<div id="pairResult"></div>';
+
+    document.getElementById("pairForm").addEventListener("submit", e => {
+      e.preventDefault();
+      showAnalogy(
+        document.getElementById("pairA").value,
+        document.getElementById("pairB").value
+      );
+    });
+
+    if (a && b) showAnalogy(a, b);
+    else {
+      document.getElementById("pairResult").innerHTML =
+        '<div class="card"><p class="small muted" style="margin-top:0">Put in two ' +
+        "words that feel related and the app works out how, then finds other " +
+        "pairs that relate the same way.</p>" +
+        '<div class="sectionTitle" style="margin-top:14px">Try one</div>' +
+        '<div class="chips">' +
+        [["benevolent", "malevolent"], ["audible", "inaudible"],
+         ["import", "export"], ["negligent", "diligent"]].map(([x, y]) =>
+          '<button class="chip" data-pair="' + esc(x) + "|" + esc(y) + '">' +
+          esc(x) + " : " + esc(y) + "</button>").join("") +
+        "</div></div>";
+      view.querySelectorAll("[data-pair]").forEach(chip => {
+        chip.addEventListener("click", () => {
+          const [x, y] = chip.dataset.pair.split("|");
+          document.getElementById("pairA").value = x;
+          document.getElementById("pairB").value = y;
+          showAnalogy(x, y);
+        });
+      });
+    }
+  }
+
+  function showAnalogy(rawA, rawB) {
+    const box = document.getElementById("pairResult");
+    if (!box) return;
+    const a = String(rawA || "").toLowerCase().trim();
+    const b = String(rawB || "").toLowerCase().trim();
+    if (!a || !b) return;
+
+    const missing = [a, b].filter(w => !Analogy || !Splitter.split(w).parts.some(p => p.entry));
+    if (!Analogy) {
+      box.innerHTML = '<div class="card"><p class="muted">Analogies are unavailable.</p></div>';
+      return;
+    }
+
+    const rel = Analogy.relate(a, b);
+    if (!rel) {
+      box.innerHTML =
+        '<div class="card"><div class="feedback no">No shared structure</div>' +
+        "<p><b>" + esc(a) + "</b> and <b>" + esc(b) + "</b> do not share a root " +
+        "or an affix frame, so there is no breakdown-level relation to show." +
+        (missing.length
+          ? " " + esc(missing.join(" and ")) + " may also be outside the dictionary."
+          : "") +
+        "</p><p class=\"small muted\" style=\"margin-bottom:0\">This app only " +
+        "claims relations it can point at in the spelling. Two words can still " +
+        "be related in meaning without being related in build.</p></div>" +
+        pairSplitHTML(a, b);
+      return;
+    }
+
+    const pairs = Analogy.analogues(a, b, 12);
+    box.innerHTML =
+      '<div class="card">' +
+      '<div class="relHead">' + esc(a) + ' <span class="relIs">is to</span> ' + esc(b) + "</div>" +
+      '<div class="relTag' + (rel.opposite ? " opposed" : "") + '">' + esc(rel.label) + "</div>" +
+      relDetailHTML(rel) +
+      "</div>" +
+      (pairs.length
+        ? '<div class="sectionTitle">Pairs that relate the same way</div>' +
+          '<div class="list">' + pairs.map(p =>
+            '<button class="listItem" data-word="' + esc(p.a) + '"' +
+            (p.b ? ' data-pair-b="' + esc(p.b) + '"' : "") + '>' +
+            '<span class="liText"><span class="lw">' + esc(p.a) +
+            (p.b ? ' <span class="relIs">is to</span> ' + esc(p.b) : "") + "</span>" +
+            '<span class="ld">' + esc(pairGloss(p)) + "</span></span>" +
+            (Analogy.isStudy(p.a) ? '<span class="dot ' + Store.level(p.a) + '"></span>' : "") +
+            "</button>").join("") + "</div>"
+        : '<p class="small muted center">No other pair in the dictionary relates ' +
+          "this way — the relation is real, but this one is on its own.</p>") +
+      pairSplitHTML(a, b);
+
+    box.querySelectorAll(".listItem").forEach(btn => {
+      btn.addEventListener("click", () => {
+        const other = btn.dataset.pairB;
+        if (other) renderAnalogy([btn.dataset.word, other]);
+        else showWordDetail(btn.dataset.word);
+      });
+    });
+  }
+
+  function relDetailHTML(rel) {
+    if (rel.type === "shared-root") {
+      return '<p class="defRow"><span class="defLabel">Shared root:</span>' +
+        '<span class="defText"><b>' + esc(rel.fromText) + "</b> — " +
+        esc(rel.fromMeaning) + "</span></p>";
+    }
+    const arrow = '<span class="relArrow">→</span>';
+    return (
+      '<p class="defRow"><span class="defLabel">Changes:</span><span class="defText">' +
+      "<b>" + esc(rel.fromText || "nothing") + "</b> " + arrow + " <b>" +
+      esc(rel.toText || "nothing") + "</b></span></p>" +
+      (rel.fromMeaning || rel.toMeaning
+        ? '<p class="defRow"><span class="defLabel">Meaning:</span>' +
+          '<span class="defText">' + esc(rel.fromMeaning || "—") + " " + arrow +
+          " " + esc(rel.toMeaning || "—") + "</span></p>"
+        : "")
+    );
+  }
+
+  function pairGloss(p) {
+    const rec = ALL_WORDS.get(p.b || p.a);
+    return rec ? rec.def : "";
+  }
+
+  function pairSplitHTML(a, b) {
+    return (
+      '<div class="sectionTitle">Both, broken apart</div>' +
+      '<div class="card">' + splitHTML(a, { showExamples: false, allowTeach: false }) + "</div>" +
+      '<div class="card" style="margin-top:10px">' +
+      splitHTML(b, { showExamples: false, allowTeach: false }) + "</div>"
+    );
+  }
+
   /* ---------- view: split ---------- */
 
   function renderSplit(preload) {
@@ -334,7 +653,8 @@
       '<div id="splitResult"></div>' +
       '<div class="sectionTitle">Word of the day</div>' +
       '<div class="card" id="dailyCard">' + splitHTML(daily, { allowTeach: true }) + "</div>" +
-      '<button class="btn wide" id="randomBtn">🎲 Split a random word</button>';
+      '<button class="btn wide" id="randomBtn">' + icon("shuffle", "bIcon") +
+        " Split a random word</button>";
 
     const input = document.getElementById("splitInput");
     const result = document.getElementById("splitResult");
@@ -406,13 +726,20 @@
   /* ---------- view: study ---------- */
 
   const MODES = [
-    { id: "flashcards", icon: "🃏", name: "Flashcards", desc: "See the word, recall the meaning, grade yourself." },
-    { id: "meaning", icon: "🎯", name: "Pick the meaning", desc: "Multiple choice from the word to its definition." },
-    { id: "word", icon: "🔤", name: "Pick the word", desc: "Multiple choice from the definition back to the word." },
-    { id: "parts", icon: "🧩", name: "Parts quiz", desc: "Identify what a prefix, root, or suffix means." },
-    { id: "spell", icon: "⌨️", name: "Spell it", desc: "Read the definition and type the word." },
-    { id: "review", icon: "🔁", name: "Due review", desc: "Only the words your schedule says are due." }
+    { id: "flashcards", icon: "cards", name: "Flashcards", desc: "See the word, recall the meaning, grade yourself." },
+    { id: "meaning", icon: "study", name: "Pick the meaning", desc: "Multiple choice from the word to its definition." },
+    { id: "word", icon: "letters", name: "Pick the word", desc: "Multiple choice from the definition back to the word." },
+    { id: "parts", icon: "puzzle", name: "Parts quiz", desc: "Identify what a prefix, root, or suffix means." },
+    { id: "spell", icon: "keyboard", name: "Spell it", desc: "Read the definition and type the word." },
+    { id: "analogies", icon: "pairs", name: "Analogies", desc: "A is to B as C is to what — the SSAT's own format." },
+    { id: "review", icon: "repeat", name: "Due review", desc: "Only the words your schedule says are due." }
   ];
+
+  /* One <use> of the sprite in index.html; colour comes from the theme. */
+  function icon(id, cls) {
+    return '<svg class="' + (cls || "gIcon") + '" aria-hidden="true"><use href="#i-' +
+      id + '"/></svg>';
+  }
 
   function renderStudy() {
     viewTitle.textContent = "Study";
@@ -424,16 +751,15 @@
     const settings = Store.getSettings();
 
     view.innerHTML =
+      masteryCard(words, sum) +
       '<div class="statGrid">' +
       stat(sum.due, "due now") +
-      stat(sum.mastered, "mastered") +
-      stat(words.length, "words in rotation") +
       stat(stats.streak || 0, "day streak") +
       "</div>" +
       '<div class="sectionTitle">Study modes</div>' +
       MODES.map(m =>
         '<button class="modeCard" data-mode="' + m.id + '">' +
-        '<span class="mIcon">' + m.icon + "</span><span><span class=\"mName\">" +
+        '<span class="mIcon">' + icon(m.icon) + "</span><span><span class=\"mName\">" +
         esc(m.name) + '</span><span class="mDesc">' + esc(m.desc) + "</span></span></button>"
       ).join("") +
       '<p class="small muted center">Sessions are ' + settings.sessionLength +
@@ -442,6 +768,36 @@
     view.querySelectorAll(".modeCard").forEach(btn => {
       btn.addEventListener("click", () => startSession(btn.dataset.mode));
     });
+  }
+
+  /* A donut of how the list breaks down by mastery, with the counts beside
+   * it. The ring is a conic gradient driven by three custom properties, so
+   * there is no chart library and nothing to load. */
+  function masteryCard(words, sum) {
+    const total = words.length || 1;
+    const pctOf = n => (100 * n) / total;
+    const known = Math.round(pctOf(sum.mastered));
+    const rows = [
+      ["mastered", sum.mastered, "var(--good)"],
+      ["learning", sum.learning, "var(--warn)"],
+      ["shaky", sum.shaky, "var(--bad)"],
+      ["not seen", sum.new, "var(--surface-3)"]
+    ];
+
+    return (
+      '<div class="card"><div class="ringRow">' +
+      '<div class="ring" style="--mastered:' + pctOf(sum.mastered) +
+      ";--learning:" + pctOf(sum.learning) +
+      ";--shaky:" + pctOf(sum.shaky) + '">' +
+      '<span class="ringLabel"><b>' + known + "%</b><span>mastered</span></span></div>" +
+      '<div class="legend">' +
+      rows.map(([name, n, color]) =>
+        '<div><span class="dot" style="background:' + color + '"></span>' +
+        "<b>" + n.toLocaleString() + "</b> " +
+        '<span class="muted">' + esc(name) + "</span></div>"
+      ).join("") +
+      "</div></div></div>"
+    );
   }
 
   function stat(value, label) {
@@ -468,6 +824,25 @@
     } else if (mode === "parts") {
       /* only words the splitter can actually break apart */
       pool = words.filter(w => Splitter.split(w).parts.some(p => p.entry));
+    } else if (mode === "analogies") {
+      /* Questions are generated, not drawn from the list, so the queue holds
+       * the answer word of each — which keeps scoring, the Leitner schedule
+       * and the progress dots working exactly as they do everywhere else. */
+      questions = [];
+      const seen = new Set();
+      for (let i = 0; i < settings.sessionLength * 4 && questions.length < settings.sessionLength; i++) {
+        const q = Analogy && Analogy.question(analogyDistractors);
+        if (!q) continue;
+        const sig = q.a + ">" + q.b + ">" + q.c;
+        if (seen.has(sig)) continue;
+        seen.add(sig);
+        questions.push(q);
+      }
+      if (!questions.length) {
+        toast("Not enough related pairs to build a round");
+        return;
+      }
+      pool = questions.map(q => q.answer);
     } else {
       pool = words.slice();
     }
@@ -498,7 +873,8 @@
       right: 0,
       wrong: 0,
       answered: false,
-      flipped: false
+      flipped: false,
+      questions: mode === "analogies" ? questions : null
     };
     renderSession();
   }
@@ -518,13 +894,16 @@
       '<div class="progressbar"><i style="width:' + pct + '%"></i></div>' +
       '<div class="spread small muted" style="margin-bottom:10px">' +
       "<span>" + (s.index + 1) + " of " + s.queue.length + "</span>" +
-      "<span>✅ " + s.right + " &nbsp; ❌ " + s.wrong + "</span></div>";
+      '<span class="tally"><span class="ok">' + icon("check", "tIcon") + s.right +
+      '</span><span class="bad">' + icon("x", "tIcon") + s.wrong +
+      "</span></span></div>";
 
     let body = "";
     if (s.mode === "flashcards" || s.mode === "review") body = flashcardHTML(word);
     else if (s.mode === "meaning") body = choiceHTML(word, "meaning");
     else if (s.mode === "word") body = choiceHTML(word, "word");
     else if (s.mode === "parts") body = partsHTML(word);
+    else if (s.mode === "analogies") body = analogyQuestionHTML(s.questions[s.index]);
     else if (s.mode === "spell") body = spellHTML(word);
 
     view.innerHTML =
@@ -536,6 +915,7 @@
     if (s.mode === "flashcards" || s.mode === "review") bindFlashcard(word);
     else if (s.mode === "meaning" || s.mode === "word") bindChoice(word);
     else if (s.mode === "parts") bindParts(word);
+    else if (s.mode === "analogies") bindAnalogyQuestion(s.questions[s.index]);
     else if (s.mode === "spell") bindSpell(word);
 
     speak(word);
@@ -557,10 +937,12 @@
     const total = s.right + s.wrong;
     const pct = total ? Math.round((s.right / total) * 100) : 0;
     view.innerHTML =
-      '<div class="card center"><div style="font-size:44px">' +
-      (pct >= 80 ? "🎉" : pct >= 50 ? "👍" : "💪") + "</div>" +
+      '<div class="card center"><div class="scoreMark ' +
+      (pct >= 80 ? "good" : pct >= 50 ? "ok" : "low") + '">' +
+      icon(pct >= 80 ? "trophy" : pct >= 50 ? "check" : "repeat", "hugeIcon") + "</div>" +
       "<h2 style=\"margin:6px 0\">" + pct + "% correct</h2>" +
-      '<p class="muted">' + s.right + " right · " + s.wrong + " to review</p></div>" +
+      '<p class="muted">' + s.right + " right · " + s.wrong + " to review</p>" +
+      memeHTML(Memes ? Memes.summary(pct) : null, pct >= 50) + "</div>" +
       '<button class="btn primary wide" id="againBtn">Study again</button>' +
       '<button class="btn wide" id="doneBtn" style="margin-top:10px">Back to modes</button>';
     document.getElementById("againBtn").addEventListener("click", () => startSession(s.mode));
@@ -683,8 +1065,7 @@
     panel.className = "card";
     panel.style.marginTop = "14px";
     panel.innerHTML =
-      '<div class="feedback ' + (correct ? "ok" : "no") + '">' +
-      (correct ? "Correct" : "Not quite") + "</div>" +
+      feedbackHTML(correct, correct ? "Correct" : "Not quite") +
       splitHTML(word, { showExamples: false });
     view.insertBefore(panel, document.getElementById("quitBtn"));
 
@@ -763,8 +1144,7 @@
         panel.style.marginTop = "14px";
         const entry = target.entry;
         panel.innerHTML =
-          '<div class="feedback ' + (correct ? "ok" : "no") + '">' +
-          (correct ? "Correct" : "Not quite") + "</div>" +
+          feedbackHTML(correct, correct ? "Correct" : "Not quite") +
           "<p><b>" + esc(entry.key) + "-</b> (" +
           esc(ORIGIN_NAMES[entry.origin] || entry.origin) + ") means <b>" +
           esc(entry.meaning) + "</b>.</p>" +
@@ -817,8 +1197,7 @@
       panel.className = "card";
       panel.style.marginTop = "14px";
       panel.innerHTML =
-        '<div class="feedback ' + (correct ? "ok" : "no") + '">' +
-        (correct ? "Correct" : "The word was " + esc(word)) + "</div>" +
+        feedbackHTML(correct, correct ? "Correct" : "The word was " + word) +
         splitHTML(word, { showExamples: false });
       view.insertBefore(panel, document.getElementById("quitBtn"));
 
@@ -842,15 +1221,15 @@
   const Games = window.WordGames || null;
   if (Games) {
     Games.mount({
-      esc, shuffle, sample, toast, stat, splitHTML, showWordDetail,
-      activeWords, ALL_WORDS, Store, Splitter, MORPHEMES
+      esc, shuffle, sample, toast, stat, splitHTML, showWordDetail, icon,
+      memeHTML, activeWords, ALL_WORDS, Store, Splitter, MORPHEMES
     });
   }
 
   function renderPlay() {
     viewTitle.textContent = "Play";
     if (!Games) {
-      view.innerHTML = '<div class="empty"><span class="bigEmoji">🎮</span>' +
+      view.innerHTML = '<div class="empty">' + icon("play", "bigIcon") +
         "Games are unavailable.</div>";
       return;
     }
@@ -889,7 +1268,7 @@
       });
       const shown = items.slice(0, 120);
       if (!shown.length) {
-        list.innerHTML = '<div class="empty"><span class="bigEmoji">🔍</span>No words match.</div>';
+        list.innerHTML = '<div class="empty">' + icon("search", "bigIcon") + "No words match.</div>";
         return;
       }
       list.innerHTML =
@@ -933,7 +1312,8 @@
         ? Math.ceil((e.due - Date.now()) / 86400000) + "d"
         : "now", "next review") +
       "</div>" +
-      '<button class="btn wide" id="speakBtn" style="margin-top:12px">🔊 Say it</button>';
+      '<button class="btn wide" id="speakBtn" style="margin-top:12px">' +
+      icon("speaker", "bIcon") + " Say it</button>";
 
     document.getElementById("backBtn").addEventListener("click", renderBrowse);
     document.getElementById("speakBtn").addEventListener("click", () => {
@@ -1012,7 +1392,7 @@
         !q || e.variants.some(v => v.indexOf(q) === 0) || e.meaning.toLowerCase().indexOf(q) !== -1
       );
       if (!items.length) {
-        list.innerHTML = '<div class="empty"><span class="bigEmoji">🌱</span>Nothing matches.</div>';
+        list.innerHTML = '<div class="empty">' + icon("roots", "bigIcon") + "Nothing matches.</div>";
         return;
       }
       list.innerHTML = items.map(e =>
@@ -1094,10 +1474,11 @@
       '<p class="defRow" style="margin-top:0"><span class="defLabel">Studying:</span>' +
       '<span class="defText"><b>' + esc(STUDY_LIST.name) + "</b> — " +
       STUDY_LIST.words.length.toLocaleString() + " words</span></p>" +
-      '<p class="small muted" style="margin-bottom:0">A further ' +
-      DICTIONARY_LIST.words.length.toLocaleString() + " everyday words back the " +
-      "dictionary so lookups return a definition and the splitter can tell a " +
-      "real word from a typo. They are not studied.</p></div>" +
+      '<p class="small muted" style="margin-bottom:0">This is the only list. A ' +
+      "further " + RECOGNITION.words.length.toLocaleString() + " everyday words " +
+      "are loaded as a recognition dictionary — they give looked-up words a " +
+      "definition and let the splitter tell a real word from a typo — but they " +
+      "are never studied, scored, or counted.</p></div>" +
 
       '<div class="sectionTitle">Session</div><div class="card">' +
       '<div class="settingRow"><div><div class="sname">Words per session</div>' +
@@ -1119,6 +1500,7 @@
       ).join("") +
       "</select></div>" +
       settingSwitch("speakWords", "Speak words aloud", "Read each word using the device voice", s.speakWords) +
+      settingSwitch("memes", "Commentary", "A caption reacts to every answer. Turn it off for quiet study.", s.memes !== false) +
       "</div>" +
 
       '<div class="sectionTitle">Appearance</div><div class="card">' +
@@ -1129,6 +1511,8 @@
         '<option value="' + v + '"' + (s.theme === v ? " selected" : "") + ">" + label + "</option>"
       ).join("") +
       "</select></div></div>" +
+
+      (Memes ? memeSectionHTML() : "") +
 
       (Learner ? learningSectionHTML() : "") +
 
@@ -1151,7 +1535,7 @@
       Store.setSetting("autoAdvanceMs", parseInt(e.target.value, 10));
     });
 
-    ["hardestFirst", "showHints", "speakWords"].forEach(key => {
+    ["hardestFirst", "showHints", "speakWords", "memes", "builtinMemes"].forEach(key => {
       document.getElementById(key).addEventListener("change", e => {
         Store.setSetting(key, e.target.checked);
       });
@@ -1190,6 +1574,133 @@
       renderSettings();
       toast("Progress reset");
     });
+
+    if (Memes) wireMemeSection();
+  }
+
+  /* ---------- your memes ---------- */
+
+  /* The app ships captions, not images. Well-known memes are photographs and
+   * video frames owned by whoever made them, so bundling them into a public
+   * repo would be redistributing someone else's work, and hotlinking would
+   * break the offline promise as well. The frame ships; you fill it. */
+  function memeSectionHTML() {
+    const mine = Memes.Library.list();
+    return (
+      '<div class="sectionTitle">Your memes</div><div class="card">' +
+      '<p class="small muted" style="margin-top:0">Add the memes you actually ' +
+      "find funny and they show up when you answer. They are stored on this " +
+      "device, work offline, and are never uploaded anywhere.</p>" +
+
+      '<div class="memeAdd">' +
+      '<label class="btn wide" for="memeFile">' + icon("image", "bIcon") +
+      " Choose images</label>" +
+      '<input type="file" id="memeFile" accept="image/*" multiple hidden>' +
+      '<div class="memeUrlRow">' +
+      '<input class="field" id="memeUrl" type="url" inputmode="url" ' +
+      'autocapitalize="none" autocorrect="off" spellcheck="false" ' +
+      'placeholder="…or paste an image URL">' +
+      '<button class="btn" id="memeUrlAdd">Add</button>' +
+      "</div></div>" +
+
+      settingSwitch(
+        "builtinMemes",
+        "Include the shipped paintings",
+        Memes.Library.builtinCount + " public-domain reaction images that came with the app",
+        Store.getSettings().builtinMemes !== false
+      ) +
+
+      (mine.length
+        ? '<div class="memeList">' + mine.map(m =>
+            '<div class="memeItem" data-id="' + m.id + '">' +
+            '<img src="' + esc(m.url) + '" alt="">' +
+            '<div class="memeItemBody">' +
+            '<input class="field memeCapInput" value="' + esc(m.caption) +
+            '" placeholder="Caption (optional)" maxlength="80">' +
+            '<div class="memeItemRow">' +
+            '<select class="field memeMood">' +
+            [["any", "Either"], ["right", "Right"], ["wrong", "Wrong"]]
+              .map(([v, label]) => '<option value="' + v + '"' +
+                (m.mood === v ? " selected" : "") + ">" + label + "</option>").join("") +
+            "</select>" +
+            '<button class="btn bad memeDel" aria-label="Remove">' +
+            icon("x", "bIcon") + "</button>" +
+            "</div></div></div>"
+          ).join("") + "</div>" +
+          '<button class="btn bad wide" id="memeClear" style="margin-top:12px">' +
+          "Remove all " + mine.length + " memes</button>"
+        : '<p class="small muted memeEmpty">Nothing added yet — the shipped ' +
+          "paintings are covering it.</p>") +
+
+      '<details class="credits"><summary>Where the shipped ones come from</summary>' +
+      '<p class="small muted">Paintings old enough to be out of copyright, so they ' +
+      "can be shipped freely. Every one was checked against its licence on " +
+      "Wikimedia Commons.</p><ul class=\"creditList\">" +
+      Memes.Library.credits().map(c =>
+        '<li><a href="' + esc(c.source) + '" target="_blank" rel="noopener">' +
+        esc(c.title) + "</a> — " + esc(c.artist) + ", " + esc(c.year) + "</li>"
+      ).join("") + "</ul></details>" +
+      "</div>"
+    );
+  }
+
+  function wireMemeSection() {
+    const redraw = () => renderSettings();
+
+    const file = document.getElementById("memeFile");
+    if (file) {
+      file.addEventListener("change", () => {
+        const chosen = [...file.files];
+        if (!chosen.length) return;
+        Promise.all(chosen.map(f =>
+          Memes.Library.fromFile(f).then(() => null).catch(err => f.name + ": " + err.message)
+        )).then(errs => {
+          const failed = errs.filter(Boolean);
+          toast(failed.length ? failed[0] : "Added " + chosen.length +
+            (chosen.length === 1 ? " meme" : " memes"));
+          redraw();
+        });
+      });
+    }
+
+    const urlBtn = document.getElementById("memeUrlAdd");
+    if (urlBtn) {
+      urlBtn.addEventListener("click", () => {
+        const field = document.getElementById("memeUrl");
+        const url = field.value.trim();
+        if (!url) return;
+        urlBtn.disabled = true;
+        urlBtn.textContent = "…";
+        Memes.Library.fromURL(url)
+          .then(() => { toast("Added"); redraw(); })
+          .catch(err => {
+            urlBtn.disabled = false;
+            urlBtn.textContent = "Add";
+            toast(err.message);
+          });
+      });
+    }
+
+    view.querySelectorAll(".memeItem").forEach(item => {
+      const id = parseInt(item.dataset.id, 10);
+      item.querySelector(".memeMood").addEventListener("change", e => {
+        Memes.Library.update(id, { mood: e.target.value });
+      });
+      item.querySelector(".memeCapInput").addEventListener("change", e => {
+        Memes.Library.update(id, { caption: e.target.value.trim() });
+      });
+      item.querySelector(".memeDel").addEventListener("click", () => {
+        Memes.Library.remove(id).then(redraw);
+      });
+    });
+
+    const clearBtn = document.getElementById("memeClear");
+    if (clearBtn) {
+      clearBtn.addEventListener("click", () => {
+        if (!window.confirm("Remove every meme you have added?")) return;
+        Memes.Library.clear().then(() => { toast("Memes removed"); redraw(); });
+      });
+    }
   }
 
   /* What the splitter has learned, shown rather than hidden: the morphemes it
@@ -1250,7 +1761,8 @@
     const stats = Store.getStats();
     if (stats.streak > 0) {
       streakChip.hidden = false;
-      streakChip.textContent = "🔥 " + stats.streak + " day" + (stats.streak === 1 ? "" : "s");
+      streakChip.innerHTML = icon("flame", "sIcon") + "<span>" + stats.streak +
+        " day" + (stats.streak === 1 ? "" : "s") + "</span>";
     } else {
       streakChip.hidden = true;
     }
@@ -1258,6 +1770,7 @@
 
   const VIEWS = {
     split: renderSplit,
+    analogy: renderAnalogy,
     study: renderStudy,
     play: renderPlay,
     browse: renderBrowse,
@@ -1285,6 +1798,12 @@
   applyTheme();
   updateStreakChip();
   if (Learner) Learner.setEnabled(Store.getSettings().adaptiveSplit !== false);
+  /* Loads in the background: answers given before it lands fall back to the
+   * drawn reactions rather than waiting on a database. */
+  if (Memes) Memes.Library.load();
+  /* One pass to build the analogy indexes, over everything the app can
+   * recognise, with the study list marked as the preferred vocabulary. */
+  if (Analogy) Analogy.index([...ALL_WORDS.keys()], w => Splitter.split(w), STUDY_LIST.words);
   go("split");
 
   if ("serviceWorker" in navigator) {

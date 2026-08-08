@@ -16,21 +16,21 @@
   const GAMES = [
     {
       id: "rush",
-      icon: "⚡",
+      icon: "bolt",
       name: "Word Rush",
       desc: "60 seconds. Answer fast, keep the combo alive.",
       best: "Best score"
     },
     {
       id: "build",
-      icon: "🧱",
+      icon: "blocks",
       name: "Build It",
       desc: "Assemble the word from its prefix, root, and suffix.",
       best: "Best build"
     },
     {
       id: "survival",
-      icon: "❤️",
+      icon: "heart",
       name: "Survival",
       desc: "Three lives. It gets harder the longer you last.",
       best: "Best streak"
@@ -79,7 +79,7 @@
         const s = scores[g.id] || { best: 0, played: 0 };
         return (
           '<button class="modeCard" data-game="' + g.id + '">' +
-          '<span class="mIcon">' + g.icon + "</span>" +
+          '<span class="mIcon">' + ctx.icon(g.icon) + "</span>" +
           '<span><span class="mName">' + esc(g.name) + "</span>" +
           '<span class="mDesc">' + esc(g.desc) + "</span>" +
           '<span class="mBest">' + esc(g.best) + ": <b>" + (s.best || 0) + "</b>" +
@@ -196,11 +196,16 @@
       ticker = setInterval(() => {
         if (!state || state.over) return;
         if (Date.now() >= state.endsAt) return finish();
-        const bar = document.getElementById("timeBar");
+        const ring = document.getElementById("timeRing");
         const label = document.getElementById("timeLeft");
         const left = Math.max(0, state.endsAt - Date.now());
-        if (bar) bar.style.width = (100 * left) / (ROUND_SECONDS * 1000) + "%";
-        if (label) label.textContent = Math.ceil(left / 1000) + "s";
+        const pct = (100 * left) / (ROUND_SECONDS * 1000);
+        if (ring) {
+          ring.style.setProperty("--left", pct);
+          ring.style.setProperty("--tick", tickColor(pct));
+          ring.classList.toggle("low", left <= 10000);
+        }
+        if (label) label.textContent = Math.ceil(left / 1000);
       }, 100);
     }
     render(view);
@@ -223,6 +228,7 @@
 
   function scoreCorrect() {
     state.right += 1;
+    state.run = (state.run || 0) + 1;
     state.combo += 1;
     state.bestCombo = Math.max(state.bestCombo, state.combo);
     const mult = Math.min(state.combo, COMBO_CAP);
@@ -232,6 +238,10 @@
 
   function scoreWrong(word) {
     state.wrong += 1;
+    /* kept so the commentary can mourn the run this answer just ended */
+    state.lastRun = state.run || 0;
+    state.run = 0;
+    state.everMissed = true;
     state.combo = 0;
     if (word && state.missed.indexOf(word) === -1) state.missed.push(word);
     if (state.id === "rush") state.endsAt -= WRONG_PENALTY_MS;
@@ -258,34 +268,72 @@
 
   /* ---------- round rendering ---------- */
 
+  /* Score on the left, and whatever measures this game's runway on the right:
+   * a countdown ring, remaining lives, or the round counter. */
   function statusBar() {
-    const esc = ctx.esc;
-    let left = "";
+    const pctLeft = state.id === "rush"
+      ? (100 * Math.max(0, state.endsAt - Date.now())) / (ROUND_SECONDS * 1000)
+      : 0;
+    const secs = Math.ceil(Math.max(0, state.endsAt - Date.now()) / 1000);
+
+    /* Every game gets the same ring, filled by whatever is running out:
+     * seconds in Rush, lives in Survival, rounds in Build It. Keeping the
+     * shape constant means the header reads the same way in all three. */
+    let gauge;
     if (state.id === "rush") {
-      left =
-        '<span id="timeLeft">' + Math.ceil(Math.max(0, state.endsAt - Date.now()) / 1000) +
-        "s</span>";
+      gauge = '<div class="timeRing' + (secs <= 10 ? " low" : "") + '" id="timeRing" ' +
+        'style="--left:' + pctLeft + ";--tick:" + tickColor(pctLeft) + '">' +
+        '<span id="timeLeft">' + secs + "</span></div>";
     } else if (state.id === "survival") {
-      left = '<span class="lives">' + "❤️".repeat(Math.max(0, state.lives)) + "</span>";
+      gauge = '<div class="timeRing" style="--left:' + (state.lives / 3) * 100 +
+        ";--tick:" + (state.lives > 1 ? "var(--accent)" : "var(--bad)") + '">' +
+        "<span>" + state.right + "</span></div>";
     } else {
-      left = "<span>" + Math.min(state.round, BUILD_ROUNDS) + " / " + BUILD_ROUNDS + "</span>";
+      const done = Math.min(state.round - 1, BUILD_ROUNDS);
+      gauge = '<div class="timeRing" style="--left:' + (done / BUILD_ROUNDS) * 100 +
+        ';--tick:var(--accent)"><span>' +
+        Math.min(state.round, BUILD_ROUNDS) + "</span></div>";
     }
 
-    const combo =
-      state.combo > 1
-        ? '<span class="combo">×' + Math.min(state.combo, COMBO_CAP) + " combo</span>"
-        : "";
+    let sub;
+    if (state.id === "survival") {
+      /* Always draw three hearts and dim the spent ones, so the row keeps
+       * its width and a lost life reads as a change rather than a reflow. */
+      sub = '<span class="lives">' + [0, 1, 2].map(i =>
+        '<span class="life' + (i < state.lives ? "" : " spent") + '">' +
+        ctx.icon("heart", "lIcon") + "</span>").join("") + "</span>";
+    } else if (state.id === "build") {
+      sub = '<span class="sub">of ' + BUILD_ROUNDS + " rounds</span>";
+    } else {
+      sub = '<span class="sub">' + state.right + " right · " + state.wrong + " missed</span>";
+    }
+
+    const combo = state.combo > 1
+      ? '<span class="combo">' + Math.min(state.combo, COMBO_CAP) + "× combo</span>"
+      : "";
 
     return (
-      (state.id === "rush"
-        ? '<div class="timeTrack"><i id="timeBar" style="width:' +
-          (100 * Math.max(0, state.endsAt - Date.now())) / (ROUND_SECONDS * 1000) +
-          '%"></i></div>'
-        : "") +
-      '<div class="gameBar">' + left +
-      '<span class="score">' + state.score + "</span>" +
-      combo + "</div>"
+      '<div class="gameHead">' + gauge +
+      '<div class="gameMeta"><span class="score">' + state.score + "</span>" +
+      sub + combo + "</div></div>"
     );
+  }
+
+  /* Redraws the header in place, without disturbing the answered question
+   * underneath it. */
+  function refreshStatus(view) {
+    const head = view.querySelector(".gameHead");
+    if (!head) return;
+    const wrap = document.createElement("div");
+    wrap.innerHTML = statusBar();
+    const fresh = wrap.firstChild;
+    if (fresh) head.replaceWith(fresh);
+  }
+
+  function tickColor(pct) {
+    if (pct <= 17) return "var(--bad)";
+    if (pct <= 45) return "var(--warn)";
+    return "var(--accent)";
   }
 
   function renderRound(view) {
@@ -347,6 +395,9 @@
         else dead = scoreWrong(state.q.word);
 
         flash(correct);
+        /* The header carries lives and score, and the pause below is long
+         * enough that leaving a spent heart lit would read as a bug. */
+        refreshStatus(view);
         /* Rush stays quick — a short beat, then on. Survival pauses so the
          * word that cost a life can actually be read. */
         const pause = correct ? 420 : state.id === "rush" ? 900 : 1500;
@@ -375,12 +426,46 @@
   function flash(ok) {
     const el = document.createElement("div");
     el.className = "flash " + (ok ? "ok" : "no");
-    el.textContent = ok
-      ? ["Nice", "Yes", "Got it", "Sharp"][Math.floor(Math.random() * 4)] +
-        (state.combo > 2 ? " ×" + Math.min(state.combo, COMBO_CAP) : "")
-      : "Missed";
+    const meme = memeFor(ok);
+    const img = meme && window.WordMemes
+      ? window.WordMemes.Library.pick(ok, ctx.Store.getSettings().builtinMemes !== false)
+      : null;
+    if (img) {
+      /* An image needs room, so the sticker becomes a card rather than a
+       * line of text pinned over the question. */
+      el.classList.add("withCard");
+      el.innerHTML = ctx.memeHTML(meme, ok);
+    } else if (meme) {
+      el.classList.add("withFace");
+      el.innerHTML = ctx.icon("face-" + meme.face, "flashFace") +
+        "<span>" + ctx.esc(meme.line) + "</span>";
+    } else {
+      el.textContent = ok
+        ? ["Nice", "Yes", "Got it", "Sharp"][Math.floor(Math.random() * 4)] +
+          (state.combo > 2 ? " ×" + Math.min(state.combo, COMBO_CAP) : "")
+        : "Missed";
+    }
     document.body.appendChild(el);
-    setTimeout(() => el.remove(), 700);
+    setTimeout(() => el.remove(), 900);
+  }
+
+  /* null when the commentary is switched off, so every caller falls back to
+   * the plain wording rather than rendering an empty sticker. */
+  function memeFor(ok) {
+    const Memes = window.WordMemes;
+    if (!Memes || ctx.Store.getSettings().memes === false) return null;
+    return Memes.answer(ok, ok ? state.run || 0 : state.lastRun || 0, !!state.everMissed);
+  }
+
+  function gameOverMeme(pct, isBest) {
+    const Memes = window.WordMemes;
+    if (!Memes || ctx.Store.getSettings().memes === false) return null;
+    return Memes.gameOver(pct, !!isBest);
+  }
+
+  function memeChip(meme, ok) {
+    if (!meme) return "";
+    return ctx.memeHTML(meme, ok);
   }
 
   /* ---------- Build It ---------- */
@@ -453,11 +538,14 @@
         ctx.Store.record(state.q.word, correct);
         if (correct) scoreCorrect();
         else scoreWrong(state.q.word);
+        const meme = memeFor(correct);
         flash(correct);
+        refreshStatus(view);
 
         const panel = document.createElement("div");
         panel.className = "card";
         panel.innerHTML =
+          memeChip(meme, correct) +
           '<div class="feedback ' + (correct ? "ok" : "no") + '">' +
           (correct ? "Correct" : "It was " + ctx.esc(state.q.word)) + "</div>" +
           ctx.splitHTML(state.q.word, { showExamples: false, allowTeach: false });
@@ -486,13 +574,16 @@
 
     view.innerHTML =
       '<div class="card center">' +
-      '<div style="font-size:46px">' + (rec.isBest ? "🏆" : pct >= 70 ? "🎉" : "💪") + "</div>" +
+      '<div class="trophy ' + (rec.isBest ? "best" : pct >= 70 ? "good" : "low") +
+      '">' + ctx.icon(rec.isBest ? "trophy" : pct >= 70 ? "check" : "repeat",
+      "hugeIcon") + "</div>" +
       '<h2 style="margin:6px 0 2px">' +
       (state.id === "survival" ? state.right + " in a row" : state.score + " points") +
       "</h2>" +
       (rec.isBest
         ? '<p class="bestTag">New best</p>'
         : '<p class="muted">Best: ' + (rec.best || 0) + "</p>") +
+      memeChip(gameOverMeme(pct, rec.isBest), rec.isBest || pct >= 50) +
       "</div>" +
       '<div class="statGrid">' +
       ctx.stat(state.right, "correct") +

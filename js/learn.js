@@ -99,12 +99,26 @@
 
   /* examples: [{ word, signature }] — the reading each word should get.
    * Runs the same perceptron used online, just over many examples at once. */
+  /* Averaged perceptron.
+   *
+   * The plain version ends wherever the last handful of examples pushed it,
+   * which is why a third epoch was scoring *worse* than a second: late
+   * corrections were undoing settled ones. Averaging every intermediate
+   * weight vector keeps what all the epochs agreed on and lets the
+   * disagreements cancel, which is the standard fix and a measurable one. */
   function trainFromExamples(examples, epochs) {
     const rounds = epochs || TRAIN_EPOCHS;
     let taught = 0;
+    const totals = Object.create(null);
+    let snapshots = 0;
+    const snapshot = () => {
+      snapshots += 1;
+      for (const k in deltas) totals[k] = (totals[k] || 0) + deltas[k];
+    };
     for (let epoch = 0; epoch < rounds; epoch++) {
       taught = 0;
       examples.forEach(ex => {
+        snapshot();
         const cands = Splitter.candidates(ex.word, CANDIDATE_CAP);
         if (cands.length < 2) return;
         const chosen = cands.find(c => c.signature === ex.signature);
@@ -125,6 +139,18 @@
         update(predicted.features, -PERCEPTRON_LR);
       });
     }
+    /* Replace the final weights with the average over the whole run. */
+    if (snapshots) {
+      deltas = Object.create(null);
+      for (const k in totals) {
+        const avg = totals[k] / snapshots;
+        if (Math.abs(avg) > 0.001) deltas[k] = avg;
+      }
+      weights = Object.create(null);
+      for (const k in base) weights[k] = clamp(base[k]);
+      for (const k in deltas) weights[k] = clamp((base[k] || 0) + deltas[k]);
+    }
+
     log.trainedAt = Date.now();
     return { examples: taught, epochs: rounds, features: Object.keys(weights).length };
   }
