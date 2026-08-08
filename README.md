@@ -37,17 +37,19 @@ Once you know that `cred` means "believe", you get *credible*, *credence*,
 
 | | |
 |---|---|
-| **Upper Level SSAT list** | 4,822 words — the one study list |
+| **Upper Level SSAT list** | 4,884 words — the one study list |
 | **Dictionary backing** | 2,442 further everyday and academic words |
-| **Words the app knows** | 7,176 |
+| **Words the app knows** | 7,238 |
 | **Word parts** | 93 prefixes, 439 roots, 135 suffixes |
 
 Every word carries a part of speech and a plain-language definition. The word
 parts each carry a meaning, a language of origin, and classic example words.
 
-There is one study list. The everyday words are loaded but never drilled — they
-exist so that looking a word up returns a definition instead of a blank, and so
-the splitter has a vocabulary wide enough to tell a real word from a typo.
+There is one study list, and only one — the SSAT. The everyday words are not a
+second list you can switch to; they are a recognition dictionary. They exist so
+that looking a word up returns a definition instead of a blank, and so the
+splitter has a vocabulary wide enough to tell a real word from a typo. They are
+never drilled, scored, or counted.
 
 ## Features
 
@@ -76,7 +78,7 @@ Answers still count toward your progress, so playing is real study.
 Each keeps a high score on the device, and the results screen lists the words
 you missed so you can tap straight through to them.
 
-**Six study modes**
+**Seven study modes**
 
 - **Flashcards** — see the word, recall the meaning, grade yourself. Optional
   part hints show the morpheme breakdown before you flip.
@@ -85,7 +87,18 @@ you missed so you can tap straight through to them.
 - **Parts quiz** — a word is split on screen and one piece is highlighted; say
   what that piece means. This is the mode that builds transferable knowledge.
 - **Spell it** — read the definition, type the word.
+- **Analogies** — A is to B as C is to what, in the test's own format.
 - **Due review** — only the words the spaced-repetition schedule says are due.
+
+**Pairs** — put in two words and the app works out how they relate, then lists
+other pairs that relate the same way. *benevolent* is to *malevolent* as
+*benediction* is to *malediction*: both swap the same prefix over the same
+root. Tapping a pair pivots the view onto it. There is an **Analogies** study
+mode too, asking it in the SSAT's own A : B :: C : ? format.
+
+Everything it reports is derived from the breakdown, so it is a relation the
+app can point at in the spelling rather than one it asserts. Where two words
+share no structure it says so instead of inventing something.
 
 **Words** — browse or search the full list, filtered by how well you know each
 one (new / shaky / learning / mastered), with a detail page per word.
@@ -152,7 +165,7 @@ network, no tracking.
    and works with no connection at all.
 
 A service worker precaches every asset on first load, so after one visit the
-app is fully offline: all 7,176 words and 667 word parts live on the device,
+app is fully offline: all 7,238 words and 667 word parts live on the device,
 along with any memes you have added.
 
 ## A splitter that learns
@@ -191,7 +204,7 @@ with the override table bypassed so the splitter has to derive each reading:
 | | exact-match accuracy |
 |---|---|
 | Hand-written rules alone | 67.9% |
-| With the shipped model | **74.8%** |
+| With the shipped model | **76.1%** |
 | Held out: train on half, test on the half it never saw | 66.9% → **72.1%** |
 
 The held-out row is the honest one — it shows corrections carrying to unseen
@@ -272,6 +285,7 @@ js/weights.js           the learned model the app ships with (generated)
 js/learn.js             perceptron: trains on corrections, on the device
 js/data/ssat.js         Upper Level SSAT words — the study list
 js/data/core.js         everyday words, dictionary backing only
+js/analogy.js           relations between word pairs, and the pairs that match
 js/store.js             settings, progress, high scores, Leitner scheduling
 js/memes.js             the commentary: captions, faces, meme library
 memes/                  ten public-domain reaction paintings, with credits

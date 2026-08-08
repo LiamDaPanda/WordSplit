@@ -8,27 +8,27 @@
   const MORPHEMES = window.WS_MORPHEMES;
   const ORIGIN_NAMES = window.WS_ORIGIN_NAMES;
 
-  /* One study list. The everyday words are still loaded, but only as
-   * dictionary backing: they give definitions for words people look up and
-   * give the splitter a wide enough vocabulary to tell a real word from a
-   * typo. They are never drilled. */
+  /* There is one list: the Upper Level SSAT. Nothing else is studied, offered,
+   * or switchable.
+   *
+   * The everyday words loaded alongside it are not a second list — they are a
+   * recognition dictionary. They exist so that looking a word up returns a
+   * definition instead of a blank, and so the splitter has a vocabulary wide
+   * enough to tell a real word from a typo. They are never drilled, never
+   * counted, and never named as a choice. */
   const STUDY_LIST = {
     key: "ssat",
     name: "Upper Level SSAT",
     raw: window.WS_LIST_SSAT || []
   };
-  const DICTIONARY_LIST = {
-    key: "core",
-    name: "Everyday & Academic",
-    raw: window.WS_LIST_CORE || []
-  };
-  const LISTS = { ssat: STUDY_LIST, core: DICTIONARY_LIST };
+  const RECOGNITION = { key: "core", raw: window.WS_LIST_CORE || [] };
+  const LISTS = { ssat: STUDY_LIST, core: RECOGNITION };
 
   const POS_NAMES = { n: "noun", v: "verb", adj: "adjective", adv: "adverb" };
 
   /* word -> {word, pos, def, lists[]} across every list, built once */
   const ALL_WORDS = new Map();
-  [STUDY_LIST, DICTIONARY_LIST].forEach(list => {
+  [STUDY_LIST, RECOGNITION].forEach(list => {
     const key = list.key;
     LISTS[key].words = [];
     LISTS[key].raw.forEach(line => {
@@ -66,9 +66,34 @@
     return STUDY_LIST.words.length ? STUDY_LIST.words : [...ALL_WORDS.keys()];
   }
 
-  /* Regular endings, so a definition can be found for a form the dictionary
-   * does not list directly ("abating" -> "abate", "duties" -> "duty"). */
+  /* Endings that let a definition be found for a form the dictionary does not
+   * list directly. Two kinds:
+   *
+   *  - inflection, where the word is the same word ("abating" -> "abate")
+   *  - derivation, where it is a word built from another ("audibility" ->
+   *    "audible"), which is where most real lookups were failing: nobody
+   *    types the dictionary headword, they type the form they just read.
+   *
+   * Sorted longest-ending-first at load, so "ibility" is tried before "ity"
+   * and the table can be written in whatever order reads best. */
   const ENDINGS = [
+    { end: "ibility", add: ["ible"], note: "the quality of being" },
+    { end: "ability", add: ["able"], note: "the quality of being" },
+    { end: "ically", add: ["ic", "ical"], note: "the adverb from" },
+    { end: "ously", add: ["ous"], note: "the adverb from" },
+    { end: "ently", add: ["ent"], note: "the adverb from" },
+    { end: "antly", add: ["ant"], note: "the adverb from" },
+    { end: "fully", add: ["ful", ""], note: "the adverb from" },
+    { end: "ily", add: ["y"], note: "the adverb from" },
+    { end: "ness", add: ["", "e"], note: "the quality of being" },
+    { end: "ancy", add: ["ant", "ance"], note: "the state of being" },
+    { end: "ency", add: ["ent", "ence"], note: "the state of being" },
+    { end: "acy", add: ["ate", "ant"], note: "the state of being" },
+    { end: "atory", add: ["ate"], note: "relating to" },
+    { end: "ized", add: ["ize"], note: "past tense of" },
+    { end: "ised", add: ["ise", "ize"], note: "past tense of" },
+    { end: "izing", add: ["ize"], note: "the -ing form of" },
+    { end: "ments", add: ["ment"], note: "plural of" },
     { end: "ies", add: ["y"], note: "plural of" },
     { end: "ied", add: ["y"], note: "past tense of" },
     { end: "ing", add: ["", "e"], note: "the -ing form of" },
@@ -78,7 +103,7 @@
     { end: "er", add: ["", "e"], note: "the comparative of" },
     { end: "ly", add: ["", "e"], note: "the adverb from" },
     { end: "s", add: [""], note: "plural of" }
-  ];
+  ].sort((x, y) => y.end.length - x.end.length);
 
   /* Find a definition for any word: the entry itself, or the entry for the
    * form it is built from. Returns null only when the word is unknown. */
@@ -1449,10 +1474,11 @@
       '<p class="defRow" style="margin-top:0"><span class="defLabel">Studying:</span>' +
       '<span class="defText"><b>' + esc(STUDY_LIST.name) + "</b> — " +
       STUDY_LIST.words.length.toLocaleString() + " words</span></p>" +
-      '<p class="small muted" style="margin-bottom:0">A further ' +
-      DICTIONARY_LIST.words.length.toLocaleString() + " everyday words back the " +
-      "dictionary so lookups return a definition and the splitter can tell a " +
-      "real word from a typo. They are not studied.</p></div>" +
+      '<p class="small muted" style="margin-bottom:0">This is the only list. A ' +
+      "further " + RECOGNITION.words.length.toLocaleString() + " everyday words " +
+      "are loaded as a recognition dictionary — they give looked-up words a " +
+      "definition and let the splitter tell a real word from a typo — but they " +
+      "are never studied, scored, or counted.</p></div>" +
 
       '<div class="sectionTitle">Session</div><div class="card">' +
       '<div class="settingRow"><div><div class="sname">Words per session</div>' +

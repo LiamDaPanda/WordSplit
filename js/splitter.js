@@ -980,6 +980,20 @@
     add("left:" + Math.min(leftover, 3), 1);
     if (cand.rootMatch && cand.rootMatch.score >= 100) add("exact", 1);
     if (cand.rootMatch) add("rlen:" + Math.min(cand.rootMatch.form.length, 7), 1);
+
+    /* Conjunctions. A weight per morpheme cannot tell "lus" the light root
+     * from "lus" the play root, because in isolation they look identical —
+     * the evidence is the company the root keeps. Pairing the root with the
+     * affixes around it gives the learner somewhere to put that. */
+    const rootId = cand.rootMatch && cand.rootMatch.entry && cand.rootMatch.entry.id;
+    if (rootId) {
+      cand.pre.parts.forEach(p => {
+        if (p.entry) add("PR:" + p.entry.id + ">" + rootId, 1);
+      });
+      cand.suf.parts.forEach(p => {
+        if (p.entry) add("RS:" + rootId + ">" + p.entry.id, 1);
+      });
+    }
     return f;
   }
 
