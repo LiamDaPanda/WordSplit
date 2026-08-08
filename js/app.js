@@ -1807,10 +1807,35 @@
   go("split");
 
   if ("serviceWorker" in navigator) {
+    /* Whether a worker was already driving this page when it loaded. On a
+     * first-ever visit there is nothing to replace, so taking control is not
+     * an update and must not trigger a reload. */
+    const hadController = !!navigator.serviceWorker.controller;
+    let reloading = false;
+
     window.addEventListener("load", () => {
-      navigator.serviceWorker.register("sw.js").catch(() => {
+      navigator.serviceWorker.register("sw.js").then(reg => {
+        /* Ask on every launch. The browser makes its own update check, but it
+         * is tied to navigation, and an app opened from the Home Screen may go
+         * a long time without one — which is exactly the case where a shipped
+         * change looks like it never arrived. */
+        if (reg && reg.update) reg.update().catch(() => {});
+      }).catch(() => {
         /* offline caching is best-effort */
       });
+    });
+
+    /* The cache is deliberately cache-first, which means a visit that arrives
+     * after an update still renders the *previous* build: by the time the new
+     * worker has installed and claimed the page, the old HTML and scripts are
+     * already on screen. Left alone the update only appears on some later
+     * launch — and an app opened from the Home Screen may not fully relaunch
+     * for weeks, which is how a shipped feature can look like it never
+     * arrived. Reload once, as soon as the new worker takes over. */
+    navigator.serviceWorker.addEventListener("controllerchange", () => {
+      if (!hadController || reloading) return;
+      reloading = true;
+      window.location.reload();
     });
   }
 })();
