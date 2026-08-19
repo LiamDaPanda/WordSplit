@@ -1633,12 +1633,15 @@
           "paintings are covering it.</p>") +
 
       '<details class="credits"><summary>Where the shipped ones come from</summary>' +
-      '<p class="small muted">Paintings old enough to be out of copyright, so they ' +
-      "can be shipped freely. Every one was checked against its licence on " +
-      "Wikimedia Commons.</p><ul class=\"creditList\">" +
+      '<p class="small muted">Paintings out of copyright and freely licensed ' +
+      "photographs, all from Wikimedia Commons and all checked against their " +
+      "licence. The CC ones ask to be credited, so they are.</p>" +
+      '<ul class="creditList">' +
       Memes.Library.credits().map(c =>
         '<li><a href="' + esc(c.source) + '" target="_blank" rel="noopener">' +
-        esc(c.title) + "</a> — " + esc(c.artist) + ", " + esc(c.year) + "</li>"
+        esc(c.title) + "</a> — " + esc(c.artist) +
+        (c.year ? ", " + esc(c.year) : "") +
+        ' <span class="lic">' + esc(c.license) + "</span></li>"
       ).join("") + "</ul></details>" +
       "</div>"
     );
