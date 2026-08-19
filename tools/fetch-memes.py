@@ -64,6 +64,15 @@ FILES = {
     "ava":       "File:Ava Yawning.jpg",
     "bart":      "File:Bart - Flickr - dcJohn.jpg",
     "blini":     "File:Blini58673737.jpg",
+    # pandas and friends
+    "panda":      "File:A Happy Panda.jpg",
+    "fubao":      "File:Fubao Panda.jpg",
+    "acrobat":    "File:Acrobatics giant Panda.jpg",
+    "redpanda":   "File:Chinese Red Panda 523440542.jpg",
+    "curiousred": "File:Curious Red Panda in Langtang National Park.jpg",
+    "capybara":   "File:046 Capybara by the river in Encontro das \u00c1guas State Park Photo by Giles Laurent.jpg",
+    "ipe":        "File:028 Capybara and Pink Ip\u00ea trees in Encontro das \u00c1guas State Park Photo by Giles Laurent.jpg",
+    "quokka":     "File:Curious Quokka.jpg",
 }
 
 # A meme card is at most ~360 CSS px wide. Commons snaps to its own buckets,

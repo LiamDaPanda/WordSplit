@@ -449,24 +449,23 @@
   }
 
   function bindAnalogyQuestion(q) {
-    view.querySelectorAll(".choice").forEach(btn => {
-      btn.addEventListener("click", () => {
-        const s = state.session;
+    const s = state.session;
+    const reveal = (correct, picked, timedOut) => {
         if (s.answered) return;
         s.answered = true;
-        const correct = btn.dataset.word === q.answer;
 
         view.querySelectorAll(".choice").forEach(b => {
           b.disabled = true;
           if (b.dataset.word === q.answer) b.classList.add("correct");
-          else if (b === btn) b.classList.add("wrong");
+          else if (b === picked) b.classList.add("wrong");
         });
 
         const panel = document.createElement("div");
         panel.className = "card";
         panel.style.marginTop = "14px";
         panel.innerHTML =
-          feedbackHTML(correct, correct ? "Correct" : "It was " + q.answer) +
+          feedbackHTML(correct, correct ? "Correct"
+            : (timedOut ? "Out of time — it was " : "It was ") + q.answer) +
           '<p class="defRow"><span class="defLabel">Relation:</span>' +
           '<span class="defText">' + esc(q.relation ? q.relation.label : "") +
           "</span></p>" +
@@ -483,8 +482,15 @@
         view.insertBefore(next, document.getElementById("quitBtn"));
         next.addEventListener("click", () => advance(correct, q.answer));
         next.focus();
+    };
+
+    view.querySelectorAll(".choice").forEach(btn => {
+      btn.addEventListener("click", () => {
+        reveal(btn.dataset.word === q.answer, btn, false);
       });
     });
+
+    s.onTimeout = () => reveal(false, null, true);
   }
 
   /* ---------- view: analogies ---------- */
@@ -731,6 +737,7 @@
     { id: "word", icon: "letters", name: "Pick the word", desc: "Multiple choice from the definition back to the word." },
     { id: "parts", icon: "puzzle", name: "Parts quiz", desc: "Identify what a prefix, root, or suffix means." },
     { id: "spell", icon: "keyboard", name: "Spell it", desc: "Read the definition and type the word." },
+    { id: "build", icon: "blocks", name: "Build it", desc: "Read the definition, then assemble the word from its parts." },
     { id: "analogies", icon: "pairs", name: "Analogies", desc: "A is to B as C is to what — the SSAT's own format." },
     { id: "review", icon: "repeat", name: "Due review", desc: "Only the words your schedule says are due." }
   ];
@@ -824,6 +831,14 @@
     } else if (mode === "parts") {
       /* only words the splitter can actually break apart */
       pool = words.filter(w => Splitter.split(w).parts.some(p => p.entry));
+    } else if (mode === "build") {
+      /* only words whose parts genuinely spell them, so every puzzle has a
+       * findable answer rather than an approximate one */
+      pool = words.filter(w => buildableWord(w));
+      if (!pool.length) {
+        toast("No words can be built from their parts yet");
+        return;
+      }
     } else if (mode === "analogies") {
       /* Questions are generated, not drawn from the list, so the queue holds
        * the answer word of each — which keeps scoring, the Leitner schedule
@@ -880,8 +895,71 @@
   }
 
   function endSession() {
+    stopQuestionTimer();
     state.session = null;
     renderStudy();
+  }
+
+  /* ---------- the clock ----------
+   *
+   * The Upper Level SSAT verbal section is 60 questions in 30 minutes, which
+   * is 30 seconds each — and knowing a word is not the same skill as knowing
+   * it in half a minute. Modes with one definite answer are timed; flashcards
+   * are not, because a self-graded card has no moment at which it is wrong.
+   */
+  const TIMED_MODES = ["meaning", "word", "parts", "spell", "analogies", "build"];
+  let questionTicker = null;
+
+  function stopQuestionTimer() {
+    if (questionTicker) {
+      clearInterval(questionTicker);
+      questionTicker = null;
+    }
+  }
+
+  function questionLimit(mode) {
+    const secs = Store.getSettings().questionSeconds;
+    if (!secs || TIMED_MODES.indexOf(mode) === -1) return 0;
+    return secs;
+  }
+
+  function timerHTML(secs) {
+    return (
+      '<div class="qTimer" id="qTimer" style="--left:100;--tick:var(--accent)">' +
+      '<span id="qLeft">' + secs + "</span></div>"
+    );
+  }
+
+  function startQuestionTimer(s, secs) {
+    stopQuestionTimer();
+    if (!secs) return;
+    const endsAt = Date.now() + secs * 1000;
+    const at = s.index;
+    const id = s.id;
+
+    const paint = () => {
+      /* A timer from an abandoned question must never fire into a later one. */
+      if (!state.session || state.session.id !== id || state.session.index !== at) {
+        return stopQuestionTimer();
+      }
+      const ring = document.getElementById("qTimer");
+      const label = document.getElementById("qLeft");
+      if (!ring) return stopQuestionTimer();
+      const left = Math.max(0, endsAt - Date.now());
+      const pct = (100 * left) / (secs * 1000);
+      ring.style.setProperty("--left", pct);
+      ring.style.setProperty("--tick", pct <= 20 ? "var(--bad)" : pct <= 50 ? "var(--warn)" : "var(--accent)");
+      ring.classList.toggle("low", left <= 5000);
+      if (label) label.textContent = Math.ceil(left / 1000);
+      if (left > 0) return;
+
+      stopQuestionTimer();
+      /* Running out is a miss, the same as it is on the test: no answer, no
+       * credit. The answer is still shown, because the point is to learn it. */
+      if (!s.answered && typeof s.onTimeout === "function") s.onTimeout();
+    };
+    paint();
+    questionTicker = setInterval(paint, 100);
   }
 
   function renderSession() {
@@ -890,10 +968,13 @@
 
     const word = s.queue[s.index];
     const pct = Math.round((s.index / s.queue.length) * 100);
+    const secs = questionLimit(s.mode);
+    s.onTimeout = null;
     const header =
       '<div class="progressbar"><i style="width:' + pct + '%"></i></div>' +
       '<div class="spread small muted" style="margin-bottom:10px">' +
       "<span>" + (s.index + 1) + " of " + s.queue.length + "</span>" +
+      (secs ? timerHTML(secs) : "") +
       '<span class="tally"><span class="ok">' + icon("check", "tIcon") + s.right +
       '</span><span class="bad">' + icon("x", "tIcon") + s.wrong +
       "</span></span></div>";
@@ -905,6 +986,7 @@
     else if (s.mode === "parts") body = partsHTML(word);
     else if (s.mode === "analogies") body = analogyQuestionHTML(s.questions[s.index]);
     else if (s.mode === "spell") body = spellHTML(word);
+    else if (s.mode === "build") body = buildHTML(word);
 
     view.innerHTML =
       header + body +
@@ -917,11 +999,14 @@
     else if (s.mode === "parts") bindParts(word);
     else if (s.mode === "analogies") bindAnalogyQuestion(s.questions[s.index]);
     else if (s.mode === "spell") bindSpell(word);
+    else if (s.mode === "build") bindBuild(word);
 
+    startQuestionTimer(s, secs);
     speak(word);
   }
 
   function advance(correct, word) {
+    stopQuestionTimer();
     const s = state.session;
     Store.record(word, correct);
     if (correct) s.right += 1;
@@ -933,6 +1018,7 @@
   }
 
   function renderSessionDone() {
+    stopQuestionTimer();
     const s = state.session;
     const total = s.right + s.wrong;
     const pct = total ? Math.round((s.right / total) * 100) : 0;
@@ -1058,14 +1144,24 @@
         showAfterAnswer(word, correct);
       });
     });
+
+    s.onTimeout = () => {
+      if (s.answered) return;
+      s.answered = true;
+      view.querySelectorAll(".choice").forEach(b => {
+        b.disabled = true;
+        if (b.dataset.word === word) b.classList.add("correct");
+      });
+      showAfterAnswer(word, false, true);
+    };
   }
 
-  function showAfterAnswer(word, correct) {
+  function showAfterAnswer(word, correct, timedOut) {
     const panel = document.createElement("div");
     panel.className = "card";
     panel.style.marginTop = "14px";
     panel.innerHTML =
-      feedbackHTML(correct, correct ? "Correct" : "Not quite") +
+      feedbackHTML(correct, correct ? "Correct" : timedOut ? "Out of time" : "Not quite") +
       splitHTML(word, { showExamples: false });
     view.insertBefore(panel, document.getElementById("quitBtn"));
 
@@ -1128,40 +1224,208 @@
   function bindParts(word) {
     const s = state.session;
     const target = s.target;
+
+    /* Shared by the tap and by the clock running out, so a timeout reveals
+     * exactly what an answer would have. */
+    const reveal = (correct, picked, timedOut) => {
+      if (s.answered) return;
+      s.answered = true;
+      view.querySelectorAll(".choice").forEach(b => {
+        b.disabled = true;
+        if (b.dataset.meaning === target.meaning) b.classList.add("correct");
+        else if (b === picked) b.classList.add("wrong");
+      });
+
+      const panel = document.createElement("div");
+      panel.className = "card";
+      panel.style.marginTop = "14px";
+      const entry = target.entry;
+      panel.innerHTML =
+        feedbackHTML(correct, correct ? "Correct" : timedOut ? "Out of time" : "Not quite") +
+        "<p><b>" + esc(entry.key) + "-</b> (" +
+        esc(ORIGIN_NAMES[entry.origin] || entry.origin) + ") means <b>" +
+        esc(entry.meaning) + "</b>.</p>" +
+        (entry.examples.length
+          ? '<p class="examples"><b>Also in:</b> ' +
+            entry.examples.map(e => esc(e)).join(", ") + "</p>"
+          : "");
+      view.insertBefore(panel, document.getElementById("quitBtn"));
+
+      const next = document.createElement("button");
+      next.className = "btn primary wide";
+      next.style.marginTop = "12px";
+      next.textContent = "Next";
+      view.insertBefore(next, document.getElementById("quitBtn"));
+      next.addEventListener("click", () => advance(correct, word));
+    };
+
     view.querySelectorAll(".choice").forEach(btn => {
       btn.addEventListener("click", () => {
-        if (s.answered) return;
-        s.answered = true;
-        const correct = btn.dataset.meaning === target.meaning;
-        view.querySelectorAll(".choice").forEach(b => {
-          b.disabled = true;
-          if (b.dataset.meaning === target.meaning) b.classList.add("correct");
-          else if (b === btn) b.classList.add("wrong");
-        });
-
-        const panel = document.createElement("div");
-        panel.className = "card";
-        panel.style.marginTop = "14px";
-        const entry = target.entry;
-        panel.innerHTML =
-          feedbackHTML(correct, correct ? "Correct" : "Not quite") +
-          "<p><b>" + esc(entry.key) + "-</b> (" +
-          esc(ORIGIN_NAMES[entry.origin] || entry.origin) + ") means <b>" +
-          esc(entry.meaning) + "</b>.</p>" +
-          (entry.examples.length
-            ? '<p class="examples"><b>Also in:</b> ' +
-              entry.examples.map(e => esc(e)).join(", ") + "</p>"
-            : "");
-        view.insertBefore(panel, document.getElementById("quitBtn"));
-
-        const next = document.createElement("button");
-        next.className = "btn primary wide";
-        next.style.marginTop = "12px";
-        next.textContent = "Next";
-        view.insertBefore(next, document.getElementById("quitBtn"));
-        next.addEventListener("click", () => advance(correct, word));
+        reveal(btn.dataset.meaning === target.meaning, btn, false);
       });
     });
+
+    s.onTimeout = () => reveal(false, null, true);
+  }
+
+  /* --- build it ---
+   *
+   * The same tile mechanic as the Build It game, but as a study mode: one word
+   * at a time, scored through the Leitner schedule like every other mode
+   * rather than against a clock and a score. Reading a definition and then
+   * assembling the word from its prefix, root and suffix is the one exercise
+   * that makes you use the breakdown rather than just recognise it.
+   */
+
+  /* Only offer a word whose parts genuinely spell it. Anything else has no
+   * fair answer, which is the whole reason the game guards this too. */
+  function buildableWord(word) {
+    const parts = Splitter.split(word).parts;
+    if (parts.length < 2) return null;
+    if (parts.some(p => !p.entry)) return null;
+    const answer = parts.map(p => p.text);
+    if (answer.join("") !== word) return null;
+    if (answer.some(t => t.length < 2)) return null;
+    return { parts, answer };
+  }
+
+  function makeBuildState(word) {
+    const built = buildableWord(word);
+    if (!built) return null;
+    const decoys = [];
+    built.parts.forEach(part => {
+      const same = MORPHEMES[part.entry.kind].filter(m => m.id !== part.entry.id);
+      sample(same, 2).forEach(m => {
+        if (built.answer.indexOf(m.key) === -1 && decoys.indexOf(m.key) === -1) {
+          decoys.push(m.key);
+        }
+      });
+    });
+    return {
+      answer: built.answer,
+      tiles: shuffle(built.answer.concat(decoys.slice(0, 4))),
+      placed: [],
+      usedIdx: []
+    };
+  }
+
+  function buildHTML(word) {
+    const s = state.session;
+    if (!s.build || s.buildAt !== s.index) {
+      s.build = makeBuildState(word);
+      s.buildAt = s.index;
+    }
+    const rec = ALL_WORDS.get(word);
+    return (
+      '<div class="card"><div class="prompt">Build the word that means:</div>' +
+      '<div class="bigDef">' + esc(rec ? rec.def : "") + "</div>" +
+      '<p class="small muted">' + s.build.answer.length + " parts · starts with <b>" +
+      esc(word[0].toUpperCase()) + "</b></p>" +
+      '<div id="buildArea">' + buildAreaHTML() + "</div></div>" +
+      '<div id="buildTray">' + buildTrayHTML() + "</div>" +
+      '<button class="btn primary wide" id="checkBuild" style="margin-top:14px"' +
+      (s.build.placed.length ? "" : " disabled") + ">Check</button>"
+    );
+  }
+
+  function buildAreaHTML() {
+    const b = state.session.build;
+    return (
+      '<div class="slotRow">' +
+      (b.placed.length
+        ? b.placed.map((t, i) =>
+            '<button class="tile placed" data-remove="' + i + '">' + esc(t) + "</button>"
+          ).join('<span class="joiner">+</span>')
+        : '<span class="slotHint">tap the parts below, in order</span>') +
+      "</div>"
+    );
+  }
+
+  function buildTrayHTML() {
+    const b = state.session.build;
+    return (
+      '<div class="tileTray">' +
+      b.tiles.map((t, i) =>
+        '<button class="tile" data-tile="' + i + '"' +
+        (b.usedIdx.indexOf(i) !== -1 ? " disabled" : "") + ">" + esc(t) + "</button>"
+      ).join("") +
+      "</div>"
+    );
+  }
+
+  function bindBuild(word) {
+    const s = state.session;
+
+    /* Only the tiles are redrawn on a tap. Re-rendering the whole session
+     * would restart the question clock, which would make the timer a reward
+     * for fiddling. */
+    const repaint = () => {
+      const area = document.getElementById("buildArea");
+      const tray = document.getElementById("buildTray");
+      const check = document.getElementById("checkBuild");
+      if (!area || !tray || !check) return;
+      area.innerHTML = buildAreaHTML();
+      tray.innerHTML = buildTrayHTML();
+      check.disabled = !s.build.placed.length;
+      wire();
+    };
+
+    const reveal = timedOut => {
+      if (s.answered) return;
+      s.answered = true;
+      const correct = !timedOut && s.build.placed.join("") === s.build.answer.join("");
+      document.querySelectorAll("#buildTray .tile, #buildArea .tile").forEach(t => {
+        t.disabled = true;
+      });
+      const check = document.getElementById("checkBuild");
+      if (check) check.disabled = true;
+
+      const panel = document.createElement("div");
+      panel.className = "card";
+      panel.style.marginTop = "14px";
+      panel.innerHTML =
+        feedbackHTML(correct, correct ? "Correct"
+          : (timedOut ? "Out of time — it was " : "It was ") + word) +
+        splitHTML(word, { showExamples: false, allowTeach: false });
+      view.insertBefore(panel, document.getElementById("quitBtn"));
+
+      const next = document.createElement("button");
+      next.className = "btn primary wide";
+      next.style.marginTop = "12px";
+      next.textContent = "Next";
+      view.insertBefore(next, document.getElementById("quitBtn"));
+      next.addEventListener("click", () => advance(correct, word));
+      next.focus();
+    };
+
+    function wire() {
+      view.querySelectorAll("#buildTray [data-tile]").forEach(btn => {
+        btn.addEventListener("click", () => {
+          if (s.answered) return;
+          const i = parseInt(btn.dataset.tile, 10);
+          if (s.build.usedIdx.indexOf(i) !== -1) return;
+          /* tracked by index, so two tiles spelling the same thing are not
+           * spent by one tap */
+          s.build.usedIdx.push(i);
+          s.build.placed.push(s.build.tiles[i]);
+          repaint();
+        });
+      });
+      view.querySelectorAll("#buildArea [data-remove]").forEach(btn => {
+        btn.addEventListener("click", () => {
+          if (s.answered) return;
+          const at = parseInt(btn.dataset.remove, 10);
+          s.build.placed.splice(at, 1);
+          s.build.usedIdx.splice(at, 1);
+          repaint();
+        });
+      });
+    }
+
+    wire();
+    const check = document.getElementById("checkBuild");
+    if (check) check.addEventListener("click", () => reveal(false));
+    s.onTimeout = () => reveal(true);
   }
 
   /* --- spelling --- */
@@ -1186,10 +1450,10 @@
     const input = document.getElementById("spellInput");
     const check = document.getElementById("checkBtn");
 
-    const submit = () => {
+    const submit = timedOut => {
       if (s.answered) return;
       s.answered = true;
-      const correct = input.value.trim().toLowerCase() === word;
+      const correct = !timedOut && input.value.trim().toLowerCase() === word;
       input.disabled = true;
       check.disabled = true;
 
@@ -1197,7 +1461,8 @@
       panel.className = "card";
       panel.style.marginTop = "14px";
       panel.innerHTML =
-        feedbackHTML(correct, correct ? "Correct" : "The word was " + word) +
+        feedbackHTML(correct, correct ? "Correct"
+          : (timedOut ? "Out of time — it was " : "The word was ") + word) +
         splitHTML(word, { showExamples: false });
       view.insertBefore(panel, document.getElementById("quitBtn"));
 
@@ -1209,10 +1474,11 @@
       next.addEventListener("click", () => advance(correct, word));
     };
 
-    check.addEventListener("click", submit);
+    check.addEventListener("click", () => submit(false));
     input.addEventListener("keydown", e => {
-      if (e.key === "Enter") submit();
+      if (e.key === "Enter") submit(false);
     });
+    s.onTimeout = () => submit(true);
     input.focus();
   }
 
@@ -1499,6 +1765,15 @@
           ((s.autoAdvanceMs || 0) === v ? " selected" : "") + ">" + label + "</option>"
       ).join("") +
       "</select></div>" +
+      '<div class="settingRow"><div><div class="sname">Time per question</div>' +
+      '<div class="sdesc">The SSAT verbal section allows 30 seconds</div></div>' +
+      '<select class="field" id="questionSeconds" style="width:auto">' +
+      [[0, "Off"], [20, "20s — fast"], [30, "30s — SSAT pace"], [45, "45s — easy"]]
+        .map(([v, label]) =>
+          '<option value="' + v + '"' +
+          ((s.questionSeconds || 0) === v ? " selected" : "") + ">" + label + "</option>"
+        ).join("") +
+      "</select></div>" +
       settingSwitch("speakWords", "Speak words aloud", "Read each word using the device voice", s.speakWords) +
       settingSwitch("memes", "Commentary", "A caption reacts to every answer. Turn it off for quiet study.", s.memes !== false) +
       "</div>" +
@@ -1533,6 +1808,10 @@
 
     document.getElementById("autoAdvanceMs").addEventListener("change", e => {
       Store.setSetting("autoAdvanceMs", parseInt(e.target.value, 10));
+    });
+
+    document.getElementById("questionSeconds").addEventListener("change", e => {
+      Store.setSetting("questionSeconds", parseInt(e.target.value, 10));
     });
 
     ["hardestFirst", "showHints", "speakWords", "memes", "builtinMemes"].forEach(key => {
