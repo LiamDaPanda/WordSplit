@@ -17,7 +17,10 @@
     hardestFirst: false,
     adaptiveSplit: true,
     memes: true,
-    builtinMemes: true
+    builtinMemes: true,
+    /* Seconds per question. The Upper Level SSAT verbal section is 60
+     * questions in 30 minutes, so 30 is the real pace. 0 turns it off. */
+    questionSeconds: 30
   };
 
   /* days until a word in each box comes back around */

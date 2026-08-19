@@ -78,7 +78,7 @@ Answers still count toward your progress, so playing is real study.
 Each keeps a high score on the device, and the results screen lists the words
 you missed so you can tap straight through to them.
 
-**Seven study modes**
+**Eight study modes**
 
 - **Flashcards** — see the word, recall the meaning, grade yourself. Optional
   part hints show the morpheme breakdown before you flip.
@@ -87,6 +87,9 @@ you missed so you can tap straight through to them.
 - **Parts quiz** — a word is split on screen and one piece is highlighted; say
   what that piece means. This is the mode that builds transferable knowledge.
 - **Spell it** — read the definition, type the word.
+- **Build it** — read the definition, then assemble the word from a tray of
+  prefix, root and suffix tiles. Only offered for words whose parts genuinely
+  spell them, so every puzzle has a findable answer: 2,167 of the list qualify.
 - **Analogies** — A is to B as C is to what, in the test's own format.
 - **Due review** — only the words the spaced-repetition schedule says are due.
 
@@ -125,13 +128,14 @@ cards — picture with the caption laid over it in the usual heavy outlined type
 Everything you add is stored as a blob in IndexedDB **on the device**. It works
 with no connection, it is never uploaded, and *Remove all* clears it.
 
-Eighteen reaction images ship with the app, so it is stocked before you add
-anything. Twelve are photographs — yawning cats, a golden retriever, a
-labradoodle mid-bounce, a tabby in a box looking thoroughly unimpressed —
-because that is where reaction images actually live. The other six are
-paintings, kept for range rather than for the whole set: Ducreux pointing and
-smirking (already a well-travelled meme in his own right), Munch's *Scream*,
-Courbet's *Man Made Mad with Fear*.
+Twenty-six reaction images ship with the app, so it is stocked before you add
+anything. Twenty are photographs — pandas, red pandas, capybaras, a quokka,
+yawning cats, a golden retriever, a labradoodle mid-bounce, a tabby in a box
+looking thoroughly unimpressed — because that is where reaction images actually
+live. The other six are paintings, kept for range rather than for the whole
+set: Ducreux pointing and smirking (already a well-travelled meme in his own
+right), Munch's *Scream*, Courbet's *Man Made Mad with Fear*. Thirteen are
+tagged for right answers and thirteen for wrong.
 
 Every licence permits redistribution — public domain, CC0, CC BY, CC BY-SA —
 and nothing NonCommercial or NoDerivatives is accepted. The CC ones ask to be
@@ -151,8 +155,19 @@ Some sites refuse to hand an image to another page. That is a CORS refusal
 with no workaround from a web page, so the app says exactly that and you can
 save the file and add it that way.
 
-**Settings** — session length, hardest-words-first ordering, part hints,
-spoken words, commentary, and
+**On the clock** — the Upper Level SSAT verbal section is 60 questions in 30
+minutes, so **30 seconds** is the real pace, and that is the default. Knowing a
+word is not the same skill as knowing it in half a minute. A ring counts down
+in the session header, turns amber then red, and pulses over the last five
+seconds; running out is a miss, exactly as it is on the test — no answer, no
+credit — but the answer and its breakdown are still shown, because the point is
+to learn it. Set it to 20s, 45s, or off in Settings.
+
+Flashcards and Due review are never timed: a card you grade yourself has no
+moment at which it becomes wrong.
+
+**Settings** — session length, time per question, hardest-words-first ordering,
+part hints, spoken words, commentary, and
 light/dark/system theme. Auto-advance is **off** by default so an answer and its
 breakdown stay on screen until you tap Next; it can be set to 3, 5, or 8
 seconds. Adaptive splitting can be turned off, and both progress and learned
@@ -294,7 +309,7 @@ js/data/core.js         everyday words, dictionary backing only
 js/analogy.js           relations between word pairs, and the pairs that match
 js/store.js             settings, progress, high scores, Leitner scheduling
 js/memes.js             the commentary: captions, faces, meme library
-memes/                  eighteen freely licensed reaction images, with credits
+memes/                  twenty-six freely licensed reaction images, with credits
 js/game.js              the three games in the Play tab
 js/app.js               views and study modes
 sw.js                   offline precache

@@ -1314,3 +1314,39 @@ button, input, select { font: inherit; color: inherit; }
   border: 1px solid var(--line);
   white-space: nowrap;
 }
+
+/* ---------- the question clock ---------- */
+
+/* Same conic ring the games use, sized to sit inside the session header so it
+ * reads as part of the progress line rather than as a separate widget. */
+.qTimer {
+  position: relative;
+  flex: none;
+  width: 34px; height: 34px;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  background: conic-gradient(var(--tick) calc(var(--left) * 1%), var(--surface-3) 0);
+  transition: background 0.12s linear;
+}
+.qTimer::after {
+  content: "";
+  position: absolute; inset: 3px;
+  border-radius: 50%;
+  background: var(--bg);
+}
+.qTimer span {
+  position: relative; z-index: 1;
+  font-size: 12px;
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.02em;
+  color: var(--text);
+}
+.qTimer.low span { color: var(--bad); }
+/* the last seconds pulse, so it registers without having to be watched */
+.qTimer.low { animation: qPulse 0.9s ease-in-out infinite; }
+@keyframes qPulse {
+  0%, 100% { transform: scale(1); }
+  50% { transform: scale(1.08); }
+}
