@@ -316,6 +316,7 @@ sw.js                   offline precache
 manifest.webmanifest    PWA metadata
 icons/                  app icons, including a maskable variant
 tools/fetch-memes.py    re-fetches memes/, refusing any licence it may not ship
+tools/fill-memes.py     refetches only the images missing or corrupted by a rate limit
 tools/train.js          regenerates js/weights.js
 tools/evaluate.js       measures whether the model helps
 .nojekyll               serves the tree as-is on GitHub Pages
