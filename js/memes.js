@@ -146,69 +146,129 @@
    */
   /* Reaction images that ship with the app.
    *
-   * Every one is an artwork old enough that its copyright has expired, and a
-   * faithful photograph of a flat public-domain painting earns no new
-   * copyright of its own, so these can be redistributed freely. Each was
-   * checked against the Wikimedia Commons licence field before being pulled
-   * in — the sourcing script is in the commit that added them.
+   * Two kinds, deliberately. Paintings old enough to be out of copyright, and
+   * freely licensed modern photographs — mostly animals, because that is where
+   * reaction images actually live and because an all-paintings set reads as a
+   * museum gift shop rather than as memes.
    *
-   * This is deliberately not a folder of Drake and Distracted Boyfriend.
-   * Those are photographs and video frames someone owns, and several of the
-   * owners enforce; copying them into a public repository would hand this
-   * project a real problem rather than a feature. Classical painters had
-   * roughly the same range of faces and are out of copyright.
-   */
+   * Every licence permits redistribution: public domain, CC0, CC BY, CC BY-SA.
+   * The two CC families require attribution, which is why each entry carries
+   * its artist, licence and source, and why the app shows a credits list.
+   * tools/fetch-memes.py re-fetches the set and refuses anything else.
+   *
+   * Still not a folder of Drake and Distracted Boyfriend: those are photographs
+   * and video frames someone owns, several of them actively enforced, and
+   * copying them into a public repository would be redistributing someone
+   * else's work. */
   const BUILTIN = [
     { file: "memes/ducreux.jpg", mood: "right",
       caption: "and you said you didn't study",
       title: "Portrait de l'artiste sous les traits d'un moqueur",
       artist: "Joseph Ducreux", year: "c. 1793",
+      license: "Public domain",
       source: "https://commons.wikimedia.org/wiki/File:Joseph_Ducreux_-_Self-portrait_of_the_artist_as_a_mocker.jpg" },
     { file: "memes/babbe.jpg", mood: "right",
       caption: "the test cannot hurt you",
       title: "Malle Babbe",
       artist: "Frans Hals", year: "c. 1633",
+      license: "Public domain",
       source: "https://commons.wikimedia.org/wiki/File:Malle_Babbe_(Frans_Hals)-WUS03734.jpg" },
-    { file: "memes/cavalier.jpg", mood: "right",
-      caption: "merely correct? no. inevitable.",
-      title: "The Laughing Cavalier",
-      artist: "Frans Hals", year: "1624",
-      source: "https://commons.wikimedia.org/wiki/File:Frans_Hals_%E2%80%93_The_Laughing_Cavalier.jpg" },
-    { file: "memes/lutenist.jpg", mood: "right",
-      caption: "a toast to the prefix",
-      title: "Self-Portrait as a Lutenist",
-      artist: "Jan Steen", year: "c. 1663",
-      source: "https://commons.wikimedia.org/wiki/File:Jan_Steen_-_Self-Portrait_as_a_Lutenist_-_WGA21754.jpg" },
-    { file: "memes/leyster.jpg", mood: "right",
-      caption: "oh this? effortless",
-      title: "Self-Portrait",
-      artist: "Judith Leyster", year: "c. 1630",
-      source: "https://commons.wikimedia.org/wiki/File:Judith_Leyster_-_Self-Portrait_-_Google_Art_Project.jpg" },
     { file: "memes/zeuxis.jpg", mood: "right",
       caption: "i knew it the whole time",
       title: "Self-Portrait as Zeuxis Laughing",
       artist: "Rembrandt", year: "c. 1662",
+      license: "Public domain",
       source: "https://commons.wikimedia.org/wiki/File:Rembrandt_Self-portrait_as_the_Laughing_Zeuxis_while_Painting_an_Old_Woman.jpg" },
+    { file: "memes/retriever.jpg", mood: "right",
+      caption: "good. very good.",
+      title: "Golden retriever, tongue out",
+      artist: "David Locke", year: "",
+      license: "CC BY 2.0",
+      source: "https://commons.wikimedia.org/wiki/File:Golden_Retriever_with_tongue_out.jpg" },
+    { file: "memes/bouncing.jpg", mood: "right",
+      caption: "vocabulary acquired",
+      title: "Maltipoo mid-bounce",
+      artist: "Rhododendrites", year: "",
+      license: "CC BY-SA 4.0",
+      source: "https://commons.wikimedia.org/wiki/File:Maltipoo_dog_bouncing_(11875).jpg" },
+    { file: "memes/tongueout.jpg", mood: "right",
+      caption: "correct, obviously",
+      title: "Dog, tongue slightly out",
+      artist: "Rhododendrites", year: "",
+      license: "CC BY-SA 4.0",
+      source: "https://commons.wikimedia.org/wiki/File:Dog_sticking_its_tongue_out_a_little_bit_(24044).jpg" },
+    { file: "memes/puppy.jpg", mood: "right",
+      caption: "first try. no notes.",
+      title: "Labradoodle puppy, yawning",
+      artist: "Wolfmann", year: "",
+      license: "CC BY-SA 4.0",
+      source: "https://commons.wikimedia.org/wiki/File:Mixed-breed_dog_Labradoodle_Miniature_poodle_puppy_6_weeks_outdoors_grass_yawn_open_mouth_(hund_blandingsrase_puddel-valp_p%C3%A5_gress_gjesper_med_%C3%A5pen_munn)_Tj%C3%B8me_Norway_2022-06_DSC06973.jpg" },
+    { file: "memes/istanbul.jpg", mood: "right",
+      caption: "this is effortless for me",
+      title: "Cat in Istanbul",
+      artist: "Alexey Komarov", year: "",
+      license: "CC BY-SA 4.0",
+      source: "https://commons.wikimedia.org/wiki/File:A_feral_cat_in_Istanbul-2014-01-23-2.jpg" },
     { file: "memes/scream.jpg", mood: "wrong",
       caption: "the definition left my head",
       title: "The Scream",
       artist: "Edvard Munch", year: "1893",
+      license: "Public domain",
       source: "https://commons.wikimedia.org/wiki/File:Edvard_Munch_-_The_Scream_-_Google_Art_Project.jpg" },
     { file: "memes/desespere.jpg", mood: "wrong",
       caption: "wait, THAT was the root?",
       title: "Le D\u00e9sesp\u00e9r\u00e9",
       artist: "Gustave Courbet", year: "c. 1843",
+      license: "Public domain",
       source: "https://commons.wikimedia.org/wiki/File:Gustave_Courbet_-_Le_D%C3%A9sesp%C3%A9r%C3%A9_(1843).jpg" },
     { file: "memes/madfear.jpg", mood: "wrong",
       caption: "it's the vocab section",
       title: "The Man Made Mad with Fear",
       artist: "Gustave Courbet", year: "c. 1844",
+      license: "Public domain",
       source: "https://commons.wikimedia.org/wiki/File:The_Man_Made_Mad_with_Fear_by_Gustave_Courbet.jpg" },
-    { file: "memes/despair.jpg", mood: "wrong",
-      caption: "we move on",
-      title: "Despair",
-      artist: "Edvard Munch", year: "1894",
-      source: "https://commons.wikimedia.org/wiki/File:Edvard_Munch_-_Despair_(1894).jpg" },
+    { file: "memes/outraged.jpg", mood: "wrong",
+      caption: "absolutely not",
+      title: "Cat, mid-yawn",
+      artist: "Uli Herrmann", year: "",
+      license: "CC BY-SA 2.0",
+      source: "https://commons.wikimedia.org/wiki/File:2008-08-20_IMG_1883_Cat_just_yawning.jpg" },
+    { file: "memes/badouzi.jpg", mood: "wrong",
+      caption: "i was so sure",
+      title: "Yawning cat at Badouzi",
+      artist: "shih-chen yang", year: "",
+      license: "CC BY-SA 2.0",
+      source: "https://commons.wikimedia.org/wiki/File:2017-02-05_Yawning_cat_at_Badouzi.jpg" },
+    { file: "memes/deadpan.jpg", mood: "wrong",
+      caption: "unimpressed. mostly with myself.",
+      title: "Tabby in a box",
+      artist: "Famartin", year: "",
+      license: "CC BY-SA 4.0",
+      source: "https://commons.wikimedia.org/wiki/File:2020-11-11_21_50_05_A_tabby_cat_yawning_while_lying_in_a_box_in_the_Franklin_Farm_section_of_Oak_Hill,_Fairfax_County,_Virginia.jpg" },
+    { file: "memes/sneer.jpg", mood: "wrong",
+      caption: "confidently incorrect",
+      title: "Cat in the grass",
+      artist: "Thomas Bresson", year: "",
+      license: "CC BY 4.0",
+      source: "https://commons.wikimedia.org/wiki/File:2021-04-03_16-39-15_chat.jpg" },
+    { file: "memes/ava.jpg", mood: "wrong",
+      caption: "pain.",
+      title: "Ava, yawning",
+      artist: "WoIfgang de Groot", year: "",
+      license: "CC0",
+      source: "https://commons.wikimedia.org/wiki/File:Ava_Yawning.jpg" },
+    { file: "memes/bart.jpg", mood: "wrong",
+      caption: "that is not what it means",
+      title: "Bart",
+      artist: "dcJohn from Live in DC, Work in Baltimore", year: "",
+      license: "CC BY 2.0",
+      source: "https://commons.wikimedia.org/wiki/File:Bart_-_Flickr_-_dcJohn.jpg" },
+    { file: "memes/blini.jpg", mood: "wrong",
+      caption: "we do not speak of this",
+      title: "Blini",
+      artist: "Pancakeman88", year: "",
+      license: "CC BY-SA 4.0",
+      source: "https://commons.wikimedia.org/wiki/File:Blini58673737.jpg" },
   ];
 
   const DB_NAME = "wordsplit-memes";
@@ -327,7 +387,8 @@
 
   function credits() {
     return BUILTIN.map(b => ({
-      title: b.title, artist: b.artist, year: b.year, source: b.source
+      title: b.title, artist: b.artist, year: b.year,
+      license: b.license, source: b.source
     }));
   }
 

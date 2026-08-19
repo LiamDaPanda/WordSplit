@@ -1299,3 +1299,18 @@ button, input, select { font: inherit; color: inherit; }
   color: var(--text-3);
 }
 .analogyLine .blank { color: var(--accent); }
+
+/* Licence tag in the credits list. CC BY and CC BY-SA require the licence to
+ * be named alongside the author, not just linked. */
+.creditList .lic {
+  display: inline-block;
+  margin-left: 4px;
+  padding: 1px 6px;
+  border-radius: 999px;
+  font-size: 10.5px;
+  font-weight: 700;
+  color: var(--text-3);
+  background: var(--surface-2);
+  border: 1px solid var(--line);
+  white-space: nowrap;
+}

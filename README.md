@@ -125,11 +125,17 @@ cards — picture with the caption laid over it in the usual heavy outlined type
 Everything you add is stored as a blob in IndexedDB **on the device**. It works
 with no connection, it is never uploaded, and *Remove all* clears it.
 
-Ten reaction images ship with the app, so it is stocked before you add
-anything. They are paintings — Ducreux pointing and smirking (already a
-well-travelled meme in his own right), Munch's *Scream*, Courbet's *Man Made
-Mad with Fear*, Frans Hals cackling — all old enough to be out of copyright,
-each checked against its licence on Wikimedia Commons and credited under
+Eighteen reaction images ship with the app, so it is stocked before you add
+anything. Twelve are photographs — yawning cats, a golden retriever, a
+labradoodle mid-bounce, a tabby in a box looking thoroughly unimpressed —
+because that is where reaction images actually live. The other six are
+paintings, kept for range rather than for the whole set: Ducreux pointing and
+smirking (already a well-travelled meme in his own right), Munch's *Scream*,
+Courbet's *Man Made Mad with Fear*.
+
+Every licence permits redistribution — public domain, CC0, CC BY, CC BY-SA —
+and nothing NonCommercial or NoDerivatives is accepted. The CC ones ask to be
+credited, so each is listed with its author, licence and source under
 **Settings → Your memes → Where the shipped ones come from**. A switch there
 turns them off if you would rather only see your own.
 
@@ -288,13 +294,13 @@ js/data/core.js         everyday words, dictionary backing only
 js/analogy.js           relations between word pairs, and the pairs that match
 js/store.js             settings, progress, high scores, Leitner scheduling
 js/memes.js             the commentary: captions, faces, meme library
-memes/                  ten public-domain reaction paintings, with credits
+memes/                  eighteen freely licensed reaction images, with credits
 js/game.js              the three games in the Play tab
 js/app.js               views and study modes
 sw.js                   offline precache
 manifest.webmanifest    PWA metadata
 icons/                  app icons, including a maskable variant
-tools/fetch-memes.py    re-fetches memes/, refusing anything not public domain
+tools/fetch-memes.py    re-fetches memes/, refusing any licence it may not ship
 tools/train.js          regenerates js/weights.js
 tools/evaluate.js       measures whether the model helps
 .nojekyll               serves the tree as-is on GitHub Pages
